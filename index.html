@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#050608" />
+    <meta name="theme-color" content="#0c0b09" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="mobile-web-app-capable" content="yes" />
     <title>WebGL Fluid Lab</title>
@@ -17,8 +17,8 @@
         <button id="hide" type="button">Hide</button>
       </header>
       <p>
-        Swipe or click-drag to paint. Mouseover is off. Hide this panel for a
-        full canvas; tap Lab to bring it back.
+        Paint dye on a GPU fluid. Slow tendril is the default. Hide this panel
+        for a full canvas; tap Lab to bring it back.
       </p>
 
       <label class="field">
@@ -75,6 +75,12 @@
       </div>
       <div id="status" class="status"></div>
     </aside>
+    <footer class="credit">
+      <a href="https://github.com/patschmittdev/webgl-fluid-lab">Source</a>
+      <span aria-hidden="true">·</span>
+      Inspired by
+      <a href="https://github.com/PavelDoGreat/WebGL-Fluid-Simulation">Pavel Dobryakov's WebGL Fluid Simulation</a>
+    </footer>
     <button id="show-panel" type="button" class="fab hidden">Lab</button>
     <script type="module" src="./assets/app.js"></script>
   </body>
