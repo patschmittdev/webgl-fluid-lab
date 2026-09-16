@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#050608" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <title>WebGL Fluid Lab</title>
+    <link rel="stylesheet" href="./assets/styles.css" />
+  </head>
+  <body>
+    <div id="fluid-root"></div>
+    <aside id="panel" class="panel">
+      <header class="panel-head">
+        <h1>WebGL Fluid Lab</h1>
+        <button id="hide" type="button">Hide</button>
+      </header>
+      <p>
+        Swipe or click-drag to paint. Mouseover is off. Hide this panel for a
+        full canvas; tap Lab to bring it back.
+      </p>
+
+      <label class="field">
+        <span>Preset</span>
+        <select id="preset"></select>
+      </label>
+      <p id="preset-note" class="hint"></p>
+
+      <div class="actions">
+        <button id="pause" type="button">Pause</button>
+        <button id="splats" type="button">Splats</button>
+        <button id="shot" type="button">Screenshot</button>
+        <button id="reset" type="button">Reset</button>
+      </div>
+
+      <fieldset>
+        <legend>Local extras</legend>
+        <div class="field">
+          <label for="autoSplats">Space / Splats count</label>
+          <div class="control">
+            <input id="autoSplats" type="range" min="0" max="20" step="1" />
+            <span class="value" data-for="autoSplats"></span>
+          </div>
+        </div>
+        <label class="field">
+          <span>Palette (hex, comma separated)</span>
+          <textarea id="colorPalette" spellcheck="false"></textarea>
+        </label>
+        <label class="field">
+          <span>Background</span>
+          <input id="backgroundColor" type="text" />
+        </label>
+        <label class="toggle" title="Press J to toggle the continuous jet">
+          <input id="jet" type="checkbox" />
+          Continuous jet
+        </label>
+      </fieldset>
+
+      <fieldset id="bool-fields">
+        <legend>Toggles</legend>
+      </fieldset>
+
+      <fieldset id="number-fields">
+        <legend>Simulation</legend>
+      </fieldset>
+
+      <div class="actions">
+        <button id="export" type="button">Export JSON</button>
+        <button id="copy-link" type="button">Copy share URL</button>
+        <label class="file-btn">
+          Import JSON
+          <input id="import" type="file" accept="application/json" hidden />
+        </label>
+      </div>
+      <div id="status" class="status"></div>
+    </aside>
+    <button id="show-panel" type="button" class="fab hidden">Lab</button>
+    <script type="module" src="./assets/app.js"></script>
+  </body>
+</html>
