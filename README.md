@@ -1,8 +1,10 @@
 # WebGL Fluid Lab
 
-A static WebGL2 fluid simulation playground. The solver, post-processing, input handling, presets, persistence, and UI are implemented in this repository.
+A static WebGL2 fluid playground in the Stam / GPU Gems 3 family. The solver, post-processing, input, presets, and UI live in this repo. Inspired by Pavel Dobryakov's 2017 demo. That is not a new fluid method. The default look is a slow grey tendril, not the rainbow CodePen.
 
 **Live demo:** [patschmittdev.github.io/webgl-fluid-lab](https://patschmittdev.github.io/webgl-fluid-lab/)
+
+**Source:** [github.com/patschmittdev/webgl-fluid-lab](https://github.com/patschmittdev/webgl-fluid-lab)
 
 The simulation uses a pressure-projection pipeline each frame: advect velocity, advect dye, calculate curl, apply vorticity confinement, calculate divergence, decay and solve pressure, subtract the pressure gradient, then render the dye. Bloom adds a soft-knee bright pass with a downsample and upsample pyramid. Sunrays use a radial transmittance pass derived from the dye mask.
 
@@ -20,12 +22,12 @@ Open `http://localhost:4173`. A `file://` URL will not load the ES modules.
 
 - Click-drag on desktop, or swipe on a phone, to paint.
 - Presets switch the complete visual configuration.
-- Each load starts on **Classic** (sim 128, dye 1024). **High detail** and **Ultra** raise those buffers.
-- Phones start with the panel hidden and cap expensive resolutions to keep heavier presets usable.
+- Each load starts on **Slow tendril**. **Wick** is a warm core with a cooler smoke tip. **Paper** is ink on a light page.
+- Phones start with the panel hidden and cap expensive resolutions.
 - Leave **Mouseover paint** off unless you want cursor motion to paint without a click.
-- **Continuous jet** is a left-side dye stream. Same solver, not an engine model.
+- **Continuous jet** follows the current preset (bottom-left tendril, bottom-center wick). Same solver, not an engine model.
 - Export or import JSON, or copy a share URL that contains the complete configuration.
-- Splats count persists in `localStorage` under `webgl-labs.fluid.state.v4`. Visual settings reset to Classic on every load.
+- Splats count persists in `localStorage` under `webgl-labs.fluid.state.v4`. Visual settings reset to Slow tendril on every load.
 
 Config from storage, imported JSON, or a share URL is validated before use. Unknown keys are dropped, numbers are clamped to the control ranges, colors must be `#rrggbb`, and invalid palette entries are removed.
 
@@ -53,11 +55,15 @@ assets/
 
 ## Credits
 
-This implementation was inspired by Pavel Dobryakov's WebGL fluid simulation and the graphics literature it builds on. No third-party solver code is distributed in this repository.
+Inspired by [Pavel Dobryakov's WebGL Fluid Simulation](https://github.com/PavelDoGreat/WebGL-Fluid-Simulation) (MIT, 2017) and the literature it cites. This repo is a separate WebGL2 playground with its own UI, presets, and shaders. It is not a drop-in copy of Pavel's `script.js`, and it is not a claim that the fluid method is original.
+
+The live page footer links here and to Pavel's repo.
 
 - [WebGL Fluid Simulation CodePen](https://codepen.io/PavelDoGreat/pen/zdWzEL) by [@PavelDoGreat](https://codepen.io/PavelDoGreat)
 - [PavelDoGreat/WebGL-Fluid-Simulation](https://github.com/PavelDoGreat/WebGL-Fluid-Simulation), including its [live demo](https://paveldogreat.github.io/WebGL-Fluid-Simulation/)
-- [WebGL Fluid Enhanced](https://github.com/michaelbrusegard/WebGL-Fluid-Enhanced), the ES-module fork previously used during comparison work
+- [WebGL Fluid Enhanced](https://github.com/michaelbrusegard/WebGL-Fluid-Enhanced), an ES-module fork used earlier for comparison
 - [GPU Gems 3, chapter 38: Fast Fluid Dynamics Simulation on the GPU](https://developer.nvidia.com/gpugems/gpugems/part-vi-beyond-triangles/chapter-38-fast-fluid-dynamics-simulation-gpu)
 - [mharrys/fluids-2d](https://github.com/mharrys/fluids-2d)
 - [haxiomic/GPU-Fluid-Experiments](https://github.com/haxiomic/GPU-Fluid-Experiments)
+
+See `NOTICE` for the original MIT copyright.

@@ -674,16 +674,16 @@ class LabEngine {
     this.targets.dye.swap();
   }
 
-  splat(x, y, dx, dy) {
+  splat(x, y, dx, dy, color) {
     if (this.destroyed || !this.targets.velocity) return;
     const bounds = this.canvas.getBoundingClientRect();
-    const color = this.generateColor().map((channel) => channel * 10);
+    const dye = color ?? this.generateColor().map((channel) => channel * 10);
     this.injectNormalized(
       x / Math.max(bounds.width, 1),
       1 - y / Math.max(bounds.height, 1),
       dx,
       -dy,
-      color,
+      dye,
     );
   }
 

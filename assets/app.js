@@ -75,12 +75,16 @@ function normalizeAutoSplats(value, fallback = 5) {
   return Number.isFinite(numeric) ? Math.min(20, Math.max(0, numeric)) : fallback;
 }
 
+function currentPreset() {
+  return PRESETS[state.preset] ?? PRESETS[DEFAULT_PRESET];
+}
+
 function loadState() {
   const fallback = {
     config: clone(labDefault),
     preset: DEFAULT_PRESET,
     autoSplats: 5,
-    jet: false,
+    jet: Boolean(PRESETS[DEFAULT_PRESET].startJet),
   };
   try {
     const stored = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
@@ -89,7 +93,7 @@ function loadState() {
       config: clone(labDefault),
       preset: DEFAULT_PRESET,
       autoSplats: normalizeAutoSplats(stored.autoSplats),
-      jet: false,
+      jet: Boolean(PRESETS[DEFAULT_PRESET].startJet),
     };
   } catch {
     return fallback;
@@ -150,6 +154,7 @@ function applyPreset(name) {
   state.preset = name;
   state.config = clone(preset.config);
   pushConfig();
+  setJet(Boolean(preset.startJet));
   const capped = MOBILE && (preset.config.simResolution > MOBILE_CAP.simResolution || preset.config.dyeResolution > MOBILE_CAP.dyeResolution);
   setStatus(capped ? `${preset.note} Phone GPU cap is on.` : preset.note);
 }
@@ -283,10 +288,14 @@ function pulseJet() {
   if (!state.jet || contextLost || !sim) return;
   const canvas = sim.canvas;
   if (!canvas) return;
-  const x = canvas.clientWidth * 0.18;
-  const y = canvas.clientHeight * 0.5;
-  const force = MOBILE ? 900 : 1400;
-  sim.splat(x, y, force, (Math.random() - 0.5) * 180);
+  const jet = currentPreset().jet ?? {};
+  const x = canvas.clientWidth * (jet.x ?? 0.2);
+  const y = canvas.clientHeight * (jet.y ?? 0.5);
+  const scale = MOBILE ? 0.7 : 1;
+  const dx = (jet.force ?? 400) * scale + (Math.random() - 0.5) * (jet.jitter ?? 40);
+  const dy = (jet.dy ?? 0) + (Math.random() - 0.5) * (jet.jitter ?? 40) * 0.4;
+  const smoke = jet.smokeTip && Math.random() < 0.38;
+  sim.splat(x, y, dx, dy, smoke ? [0.52, 0.5, 0.47] : undefined);
 }
 
 function stopJetTimer() {
@@ -297,7 +306,7 @@ function stopJetTimer() {
 function startJetTimer() {
   stopJetTimer();
   if (state.jet && sim && !document.hidden && !contextLost) {
-    jetTimer = setInterval(pulseJet, 40);
+    jetTimer = setInterval(pulseJet, currentPreset().jet?.interval ?? 80);
   }
 }
 
@@ -305,7 +314,6 @@ function setJet(enabled) {
   state.jet = enabled;
   persist();
   startJetTimer();
-  if (enabled) setStatus("Continuous jet from the left. Same dye sim, not a real engine.");
   document.querySelector("#jet").checked = enabled;
 }
 
@@ -315,7 +323,6 @@ function bindActions() {
   });
   document.querySelector("#reset").addEventListener("click", () => {
     applyPreset(DEFAULT_PRESET);
-    setJet(false);
   });
   document.querySelector("#pause").addEventListener("click", () => {
     const paused = sim.togglePause(true);
@@ -445,7 +452,7 @@ function bootstrap() {
   if (!hashIsValid) {
     setStatus("Share hash was invalid");
   } else if (started) {
-    setStatus(MOBILE ? "Swipe to paint. Tap Lab for controls." : "Dark until you paint. Click-drag or swipe.");
+    setStatus(MOBILE ? "Swipe to paint. Tap Lab for controls." : currentPreset().note);
   }
 }
 

@@ -1,7 +1,7 @@
 {
   "name": "webgl-fluid-lab",
   "private": true,
-  "description": "Static WebGL2 fluid simulation playground",
+  "description": "Static WebGL2 fluid playground inspired by Pavel Dobryakov's WebGL Fluid Simulation",
   "homepage": "https://patschmittdev.github.io/webgl-fluid-lab/",
   "scripts": {
     "start": "npx --yes serve . -p 4173"

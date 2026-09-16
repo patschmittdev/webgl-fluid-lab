@@ -1,9 +1,11 @@
+This playground is inspired by Pavel Dobryakov's WebGL Fluid Simulation
+(https://github.com/PavelDoGreat/WebGL-Fluid-Simulation). That original
+work is MIT-licensed. The notice below is included so that license is
+honored even though this repository is a separate implementation.
+
 MIT License
 
-Copyright (c) 2026 Patrick Schmitt
-
-Inspired by WebGL Fluid Simulation, Copyright (c) 2017 Pavel Dobryakov.
-See NOTICE for that original MIT notice.
+Copyright (c) 2017 Pavel Dobryakov
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -19,6 +21,6 @@ THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
 AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+LIABILITY, WHETHER IN ANY ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.

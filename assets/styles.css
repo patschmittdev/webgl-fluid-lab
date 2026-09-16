@@ -1,12 +1,12 @@
 :root {
-  --panel: #12151c;
-  --panel-border: #2a3140;
-  --text: #f2f4f7;
-  --muted: #9aa3b2;
-  --accent: #7dd3fc;
-  --control: #1c232e;
-  --control-hover: #273140;
-  --radius: 12px;
+  --panel: #161410;
+  --panel-border: #3a342c;
+  --text: #f3efe6;
+  --muted: #b4aa98;
+  --accent: #e8b86d;
+  --control: #221e18;
+  --control-hover: #2e2921;
+  --radius: 2px;
   color-scheme: dark;
   font-family: "Segoe UI", system-ui, sans-serif;
 }
@@ -17,7 +17,7 @@ html, body {
   margin: 0;
   height: 100%;
   height: 100dvh;
-  background: #050608;
+  background: #0c0b09;
   color: var(--text);
   overflow: hidden;
   overscroll-behavior: none;
@@ -100,7 +100,7 @@ input[type="text"], select, textarea, button {
   color: var(--text);
   background: var(--control);
   border: 1px solid var(--panel-border);
-  border-radius: 8px;
+  border-radius: var(--radius);
 }
 
 input[type="text"], select {
@@ -120,8 +120,8 @@ select {
 }
 
 select option, select optgroup {
-  background: #1c232e;
-  color: #f2f4f7;
+  background: #221e18;
+  color: #f3efe6;
 }
 
 textarea {
@@ -154,7 +154,7 @@ button:hover, .file-btn:hover, button:focus-visible {
 
 fieldset {
   border: 1px solid var(--panel-border);
-  border-radius: 10px;
+  border-radius: var(--radius);
   margin: 0 0 12px;
   padding: 10px;
 }
@@ -188,6 +188,31 @@ legend {
   min-height: 1.1em;
 }
 
+.credit {
+  position: fixed;
+  left: max(12px, env(safe-area-inset-left));
+  bottom: max(10px, env(safe-area-inset-bottom));
+  z-index: 9;
+  max-width: min(420px, calc(100vw - 96px));
+  margin: 0;
+  padding: 6px 8px;
+  background: rgba(22, 20, 16, 0.82);
+  border: 1px solid var(--panel-border);
+  color: var(--muted);
+  font-size: 0.7rem;
+  line-height: 1.35;
+}
+
+.credit a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.credit a:hover,
+.credit a:focus-visible {
+  text-decoration: underline;
+}
+
 .fab {
   position: fixed;
   right: max(12px, env(safe-area-inset-right));
@@ -196,7 +221,7 @@ legend {
   min-width: 56px;
   min-height: 44px;
   padding: 10px 16px;
-  border-radius: 999px;
+  border-radius: var(--radius);
   background: var(--panel);
   border: 1px solid var(--panel-border);
   color: var(--text);
@@ -208,6 +233,12 @@ legend {
 .fab.hidden { display: none; }
 
 @media (max-width: 640px) {
+  .credit {
+    top: max(8px, env(safe-area-inset-top));
+    bottom: auto;
+    max-width: calc(100vw - 24px);
+  }
+
   .panel {
     top: auto;
     left: 8px;
