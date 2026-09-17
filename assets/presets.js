@@ -29,44 +29,47 @@ const defaultConfig = Object.freeze({
   sunraysWeight: 1.1,
 });
 
-export const DEFAULT_PRESET = "slowTendril";
+export const DEFAULT_PRESET = "smoke";
 
 const base = {
   ...defaultConfig,
   hover: false,
-  simResolution: 256,
-  dyeResolution: 1024,
-  pressureIterations: 24,
+  simResolution: 384,
+  dyeResolution: 1536,
+  pressureIterations: 32,
   shading: true,
   colorful: false,
   bloom: false,
   sunrays: false,
+  brightness: 1.2,
   backgroundColor: "#0c0b09",
 };
 
+const paintJet = {
+  interval: 80,
+  x: 0.2,
+  y: 0.5,
+  force: 260,
+  dy: 0,
+  jitter: 40,
+};
+
 export const PRESETS = {
-  slowTendril: {
-    label: "Slow tendril",
-    note: "Default. One lazy grey filament. Same solver, different first look.",
-    startJet: true,
-    jet: {
-      interval: 90,
-      x: 0.22,
-      y: 0.78,
-      force: 220,
-      dy: -90,
-      jitter: 28,
-    },
+  smoke: {
+    label: "Smoke",
+    note: "Default. Soft grey plumes. Paint them yourself.",
+    startJet: false,
+    jet: paintJet,
     config: {
       ...base,
-      densityDissipation: 0.12,
-      velocityDissipation: 0.05,
-      pressure: 0.45,
-      curl: 6,
-      splatRadius: 0.38,
-      splatForce: 1800,
+      densityDissipation: 0.35,
+      velocityDissipation: 0.08,
+      pressure: 0.5,
+      curl: 8,
+      splatRadius: 0.42,
       colorPalette: ["#d6d3d1", "#a8a29e", "#78716c"],
-      brightness: 0.85,
+      brightness: 1,
+      backgroundColor: "#111111",
     },
   },
   wick: {
@@ -101,14 +104,7 @@ export const PRESETS = {
     label: "Paper",
     note: "Ink on a light page. Paint it yourself.",
     startJet: false,
-    jet: {
-      interval: 80,
-      x: 0.2,
-      y: 0.5,
-      force: 260,
-      dy: 0,
-      jitter: 40,
-    },
+    jet: paintJet,
     config: {
       ...base,
       inverted: true,
@@ -119,6 +115,33 @@ export const PRESETS = {
       curl: 10,
       splatRadius: 0.22,
       brightness: 0.7,
+    },
+  },
+  pavel: {
+    label: "Pavel 2017",
+    note: "Rainbow dye at Pavel Dobryakov's demo resolutions. Kept so you can compare.",
+    startJet: false,
+    jet: {
+      interval: 40,
+      x: 0.18,
+      y: 0.5,
+      force: 1400,
+      dy: 0,
+      jitter: 180,
+    },
+    config: {
+      ...defaultConfig,
+      hover: false,
+      simResolution: 128,
+      dyeResolution: 1024,
+      pressureIterations: 20,
+      splatRadius: 0.25,
+      colorful: true,
+      colorPalette: [],
+      bloom: true,
+      sunrays: true,
+      brightness: 1.15,
+      backgroundColor: "#000000",
     },
   },
 };

@@ -1,6 +1,6 @@
 # WebGL Fluid Lab
 
-A static WebGL2 fluid playground in the Stam / GPU Gems 3 family. The solver, post-processing, input, presets, and UI live in this repo. Inspired by Pavel Dobryakov's 2017 demo. 
+A static WebGL2 fluid playground in the Stam / GPU Gems 3 family. The solver, post-processing, input, presets, and UI live in this repo. Inspired by Pavel Dobryakov's 2017 demo. The default look is grey smoke, not the rainbow CodePen.
 
 **Live demo:** [patschmittdev.github.io/webgl-fluid-lab](https://patschmittdev.github.io/webgl-fluid-lab/)
 
@@ -20,12 +20,12 @@ Open `http://localhost:4173`. A `file://` URL will not load the ES modules.
 
 - Click-drag on desktop, or swipe on a phone, to paint.
 - Presets switch the complete visual configuration.
-- Each load starts on **Slow tendril**. **Wick** is a warm core with a cooler smoke tip. **Paper** is ink on a light page.
+- Each load starts on **Smoke**. **Wick** is a warm core with a cooler smoke tip. **Paper** is ink on a light page. **Pavel 2017** is the original rainbow demo look.
 - Phones start with the panel hidden and cap expensive resolutions.
 - Leave **Mouseover paint** off unless you want cursor motion to paint without a click.
-- **Continuous jet** follows the current preset (bottom-left tendril, bottom-center wick). Same solver, not an engine model.
+- **Continuous jet** follows the current preset (off for Smoke and Paper, on for Wick). Same solver, not an engine model.
 - Export or import JSON, or copy a share URL that contains the complete configuration.
-- Splats count persists in `localStorage` under `webgl-labs.fluid.state.v4`. Visual settings reset to Slow tendril on every load.
+- Splats count persists in `localStorage` under `webgl-labs.fluid.state.v4`. Visual settings reset to Smoke on every load.
 
 Config from storage, imported JSON, or a share URL is validated before use. Unknown keys are dropped, numbers are clamped to the control ranges, colors must be `#rrggbb`, and invalid palette entries are removed.
 
