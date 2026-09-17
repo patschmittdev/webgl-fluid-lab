@@ -1,10 +1,8 @@
 # WebGL Fluid Lab
 
-A static WebGL2 fluid playground in the Stam / GPU Gems 3 family. The solver, post-processing, input, presets, and UI live in this repo. Inspired by Pavel Dobryakov's 2017 demo. That is not a new fluid method. The default look is a slow grey tendril, not the rainbow CodePen.
+A static WebGL2 fluid playground in the Stam / GPU Gems 3 family. The solver, post-processing, input, presets, and UI live in this repo. Inspired by Pavel Dobryakov's 2017 demo. 
 
 **Live demo:** [patschmittdev.github.io/webgl-fluid-lab](https://patschmittdev.github.io/webgl-fluid-lab/)
-
-**Source:** [github.com/patschmittdev/webgl-fluid-lab](https://github.com/patschmittdev/webgl-fluid-lab)
 
 The simulation uses a pressure-projection pipeline each frame: advect velocity, advect dye, calculate curl, apply vorticity confinement, calculate divergence, decay and solve pressure, subtract the pressure gradient, then render the dye. Bloom adds a soft-knee bright pass with a downsample and upsample pyramid. Sunrays use a radial transmittance pass derived from the dye mask.
 
