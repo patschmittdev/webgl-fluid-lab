@@ -1,6 +1,6 @@
 # WebGL Fluid Lab
 
-A static WebGL2 fluid playground in the Stam / GPU Gems 3 family. The solver, post-processing, input, presets, and UI live in this repo. Inspired by Pavel Dobryakov's 2017 demo. The default look is grey smoke, not the rainbow CodePen.
+A static WebGL2 fluid playground in the Stam / GPU Gems 3 family. The solver, post-processing, input, presets, and UI live in this repo. Inspired by Pavel Dobryakov's 2017 demo, whose rainbow look is the default preset.
 
 **Live demo:** [patschmittdev.github.io/webgl-fluid-lab](https://patschmittdev.github.io/webgl-fluid-lab/)
 
@@ -20,12 +20,12 @@ Open `http://localhost:4173`. A `file://` URL will not load the ES modules.
 
 - Click-drag on desktop, or swipe on a phone, to paint.
 - Presets switch the complete visual configuration.
-- Each load starts on **Smoke**. **Wick** is a warm core with a cooler smoke tip. **Paper** is ink on a light page. **Pavel 2017** is the original rainbow demo look.
+- Each load starts on **Pavel 2017**, the original rainbow demo look. **Smoke** uses soft grey plumes. **Wick** is a warm core with a cooler smoke tip. **Paper** is ink on a light page.
 - Phones start with the panel hidden and cap expensive resolutions.
 - Leave **Mouseover paint** off unless you want cursor motion to paint without a click.
 - **Continuous jet** follows the current preset (off for Smoke and Paper, on for Wick). Same solver, not an engine model.
 - Export or import JSON, or copy a share URL that contains the complete configuration.
-- Splats count persists in `localStorage` under `webgl-labs.fluid.state.v4`. Visual settings reset to Smoke on every load.
+- Splats count persists in `localStorage` under `webgl-labs.fluid.state.v4`. Visual settings reset to Pavel 2017 on every load.
 
 Config from storage, imported JSON, or a share URL is validated before use. Unknown keys are dropped, numbers are clamped to the control ranges, colors must be `#rrggbb`, and invalid palette entries are removed.
 
@@ -55,7 +55,7 @@ assets/
 
 Inspired by [Pavel Dobryakov's WebGL Fluid Simulation](https://github.com/PavelDoGreat/WebGL-Fluid-Simulation) (MIT, 2017) and the literature it cites. This repo is a separate WebGL2 playground with its own UI, presets, and shaders. It is not a drop-in copy of Pavel's `script.js`, and it is not a claim that the fluid method is original.
 
-The live page footer links here and to Pavel's repo.
+The live page footer links to this repository. Attribution and upstream references are maintained here in the README.
 
 - [WebGL Fluid Simulation CodePen](https://codepen.io/PavelDoGreat/pen/zdWzEL) by [@PavelDoGreat](https://codepen.io/PavelDoGreat)
 - [PavelDoGreat/WebGL-Fluid-Simulation](https://github.com/PavelDoGreat/WebGL-Fluid-Simulation), including its [live demo](https://paveldogreat.github.io/WebGL-Fluid-Simulation/)

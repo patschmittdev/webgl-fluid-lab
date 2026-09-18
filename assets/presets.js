@@ -29,7 +29,7 @@ const defaultConfig = Object.freeze({
   sunraysWeight: 1.1,
 });
 
-export const DEFAULT_PRESET = "smoke";
+export const DEFAULT_PRESET = "pavel";
 
 const base = {
   ...defaultConfig,
@@ -57,7 +57,7 @@ const paintJet = {
 export const PRESETS = {
   smoke: {
     label: "Smoke",
-    note: "Default. Soft grey plumes. Paint them yourself.",
+    note: "Soft grey plumes. Paint them yourself.",
     startJet: false,
     jet: paintJet,
     config: {
@@ -119,7 +119,7 @@ export const PRESETS = {
   },
   pavel: {
     label: "Pavel 2017",
-    note: "Rainbow dye at Pavel Dobryakov's demo resolutions. Kept so you can compare.",
+    note: "Default. Rainbow dye at Pavel Dobryakov's demo resolutions.",
     startJet: false,
     jet: {
       interval: 40,
