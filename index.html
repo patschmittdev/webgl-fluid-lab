@@ -38,7 +38,7 @@
         <button id="reset" type="button">Reset</button>
       </div>
 
-      <details id="music-section"><summary>Music</summary>
+      <details id="music-section"><summary id="music-heading">Music</summary>
         <p>Play music in another tab, then share that tab's audio.</p>
         <div class="music-sources">
           <button id="tab-audio" class="primary" type="button">Use tab audio</button>
@@ -61,27 +61,27 @@
         </div>
         <p id="music-status" role="status" aria-live="polite"></p>
       </details>
-      <details><summary>Colour</summary><div id="colour-fields">
-        <p>Palette</p><div id="colorPalette" class="swatches"></div>
+      <details><summary id="colour-heading">Colour</summary><div id="colour-fields">
+        <p id="palette-label">Palette</p><div id="colorPalette" class="swatches"></div>
         <div class="actions"><button id="add-swatch" type="button">Add swatch</button><button id="random-colours" type="button">Random colours</button></div>
         <label class="field">Background<input id="backgroundColor" type="color" /></label>
       </div></details>
-      <details><summary>Glow</summary><div id="glow-fields"></div></details>
-      <details><summary>Paint</summary><div id="paint-fields"></div>
+      <details><summary id="glow-heading">Glow</summary><div id="glow-fields"></div></details>
+      <details><summary id="paint-heading">Paint</summary><div id="paint-fields"></div>
         <label class="toggle"><input id="jet" type="checkbox" />Continuous jet</label>
         <div class="field"><label for="autoSplats">Space / Splats count</label><div class="control"><input id="autoSplats" type="range" min="0" max="20" step="1" /><span class="value" data-for="autoSplats"></span></div></div>
       </details>
-      <details><summary>Physics</summary><div id="physics-fields"></div></details>
-      <details><summary>Simulation</summary><div id="simulation-fields"></div></details>
-      <details><summary>Share</summary><div class="actions">
+      <details><summary id="physics-heading">Physics</summary><div id="physics-fields"></div></details>
+      <details><summary id="simulation-heading">Simulation</summary><div id="simulation-fields"></div></details>
+      <details><summary id="share-heading">Share</summary><div class="actions">
         <button id="export" type="button">Export JSON</button>
         <button id="copy-link" type="button">Copy share URL</button>
       </div><label class="field">Import JSON<input id="import" type="file" accept="application/json" /></label></details>
       <div id="status" class="status" role="status" aria-live="polite"></div>
-      <p class="shortcuts"><kbd>Space</kbd>: Splats | <kbd>P</kbd>: Pause | <kbd>M</kbd>: Demo beat | <kbd>J</kbd>: Continuous jet | <kbd>H</kbd>: Panel | <kbd>D</kbd>: Paint | <kbd>W</kbd>: Wall | <kbd>E</kbd>: Erase | <kbd>V</kbd>: View</p>
+      <p id="shortcuts" class="shortcuts"><kbd>Space</kbd>: Splats | <kbd>P</kbd>: Pause | <kbd>M</kbd>: Demo beat | <kbd>J</kbd>: Continuous jet | <kbd>H</kbd>: Panel | <kbd>D</kbd>: Paint | <kbd>W</kbd>: Wall | <kbd>E</kbd>: Erase | <kbd>V</kbd>: View</p>
     <footer class="credit">
-      <a href="https://github.com/patschmittdev/webgl-fluid-lab">Source</a>
-      <span>Inspired by <a href="https://github.com/PavelDoGreat/WebGL-Fluid-Simulation">Pavel Dobryakov's WebGL Fluid Simulation (MIT)</a></span>
+      <a id="source-link" href="https://github.com/patschmittdev/webgl-fluid-lab">Source</a>
+      <span>Inspired by <a id="credit-link" href="https://github.com/PavelDoGreat/WebGL-Fluid-Simulation">Pavel Dobryakov's WebGL Fluid Simulation (MIT)</a></span>
     </footer>
     </aside>
     <div id="paint-hint">Drag to paint</div>
