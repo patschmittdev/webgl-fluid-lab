@@ -85,11 +85,11 @@ test("new share payloads validate physics and omit tool and wall data", () => {
       tool: "wall",
       obstacles: [{ x: 0.2, y: 0.5, radius: 0.1 }],
     },
-    preset: "tunnel",
+    preset: "blackhole",
   }));
   assert.deepEqual(decoded, {
     config: { view: "temperature", heat: 5, inflow: 0, buoyancy: 70, cooling: 0.5 },
-    preset: "tunnel",
+    preset: "blackhole",
     jet: false,
   });
 });

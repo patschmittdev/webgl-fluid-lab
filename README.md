@@ -22,7 +22,7 @@ The page needs WebGL2 and the `EXT_color_buffer_float` extension. Without them i
 - **Smoke**: soft grey plumes.
 - **Flame**: a flame from a nozzle at the bottom, coloured by its own heat, white at the base through yellow and orange, with grey smoke where it has cooled.
 - **Ink**: ink on a light page. Thin strokes make a wash and overlapping inks darken.
-- **Wind tunnel**: steady flow from left to right past a disc, with thin streams of dye to show the wake. Draw your own walls.
+- **Black hole**: a flat slice through a black hole, seen from above. Rays of light enter from the left, and each one follows the path light takes around a black hole that does not spin. The outer rays bend and cross behind it, and the closer ones fall in. The two that pass just outside the capture distance are turned right round the hole and leave steeply. Near the hole the fluid swirls and carries light off the rays that reach it, which builds the glowing disc. The other views show the same scene: the swirl in Speed, the low pressure at its centre, and the disc warming in Temperature. Draw a wall and it casts a shadow, and bent rays reach part of the way into it. Only the paths are physical. The brightness, the colours and the disc are not.
 - **Plume**: warm smoke rising from the bottom on buoyancy alone.
 - **Collide**: every splat is repeated around the centre, rotated and mirrored, inside the simulation. Mirrored pairs of streams run into each other and shoot outward. It is built for music.
 
@@ -30,7 +30,7 @@ The page needs WebGL2 and the `EXT_color_buffer_float` extension. Without them i
 
 Hover over any control, or focus it with the keyboard, for a one-line description.
 
-- **Paint, Wall, Erase**: drag on the canvas to add dye and push the fluid, draw solid walls, or rub walls out. Clear walls removes all of them, including a preset's own shapes. Reset brings those back.
+- **Paint, Wall, Erase**: drag on the canvas to add dye and push the fluid, draw solid walls, or rub walls out. Clear walls removes all of them. The black hole is not a wall and cannot be erased.
 - **View**: dye, speed, vorticity, pressure or temperature. Glow applies to the dye view only.
 - **Pause, Splats, Screenshot, Reset**: Reset clears the fluid and restores the current preset's settings. Screenshot saves the current view as a PNG.
 - **Colour, Glow, Paint, Physics, Simulation**: sliders and toggles, collapsed by default. Symmetry in Paint gives any preset Collide's repeated splats.
@@ -58,9 +58,9 @@ Open Music and pick a source:
 - **Demo beat**: a generated drum loop, for trying it out.
 - **Choose a track**: an audio file from your computer. You can also drop one on the page.
 
-The page measures bass, mid and treble, finds beats, and follows how loud and busy the track is. Each preset responds in its own way: Collide fires its central ring on beats and drifts softer wisps in from the edges between them, Flame burns harder with the bass. Stopping the music puts everything back.
+The page measures bass, mid and treble, finds beats, and follows how loud and busy the track is. Each preset responds in its own way: Collide fires its central ring on beats and drifts softer wisps in from the edges between them, Flame burns harder with the bass, the black hole's disc flares with it. Stopping the music puts everything back.
 
-No audio is bundled, uploaded or recorded, and the microphone is never used. **Reduce flashing** limits beat bursts to two a second and stops music from changing the glow. It starts switched on when the device asks for reduced motion.
+No audio is bundled, uploaded or recorded, and the microphone is never used. **Reduce flashing** limits beat bursts to two a second and stops music from changing the glow or flaring the black hole's disc. It starts switched on when the device asks for reduced motion.
 
 ## Performance
 
@@ -68,7 +68,7 @@ Presets start at the highest resolution the sliders allow (simulation 512, dye 2
 
 ## How it works
 
-Each frame the solver moves velocity and dye along the flow, strengthens small swirls, solves for pressure, and removes the part of the velocity that would compress the fluid. Optional passes add heat and buoyancy, solid walls and a left-to-right inlet and outlet.
+Each frame the solver moves velocity and dye along the flow, strengthens small swirls, solves for pressure, and removes the part of the velocity that would compress the fluid. Optional passes add heat and buoyancy, solid walls, a left-to-right inlet and outlet, and a held swirl around the black hole. The black hole's rays are not fluid. Their paths are worked out when the preset starts, or when a wall changes, and drawn over the picture each frame. Near the hole their light is also fed into the dye, which the swirl carries round.
 
 ```text
 index.html
@@ -84,7 +84,8 @@ assets/
   engines/
     lab.js                solver and GPU resources
     lab/shaders.js        core simulation and display shaders
-    lab/physics-shaders.js  walls, through-flow, heat, field views
+    lab/physics-shaders.js  walls, through-flow, heat, black hole, field views
+    lab/light.js            paths of light around the black hole
 tests/
 ```
 

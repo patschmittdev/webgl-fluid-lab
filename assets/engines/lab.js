@@ -1,6 +1,7 @@
 import { FRAGMENT_SHADERS, FULLSCREEN_VERTEX_SHADER } from "./lab/shaders.js";
 
-import { PHYSICS_SHADERS, withSolidMask, withSolidDisplay } from "./lab/physics-shaders.js";
+import { PHYSICS_SHADERS, RAY_VERTEX_SHADER, withSolidMask, withSolidDisplay } from "./lab/physics-shaders.js";
+import { buildRays } from "./lab/light.js";
 import { PHYSICS_DEFAULTS, MUSIC_DEFAULTS, VIEWS } from "../presets.js";
 import { createMusicResponse } from "../audio.js";
 
@@ -12,6 +13,7 @@ export const OPTIONAL_SHADERS = {
 };
 
 const MAX_TIME_STEP = 0.016666;
+const WALL_SHADOW_SIZE = 160;
 
 const DEFAULT_CONFIG = Object.freeze({
   ...PHYSICS_DEFAULTS,
@@ -60,8 +62,8 @@ function compileShader(gl, type, source, label) {
   return shader;
 }
 
-function createProgram(gl, fragmentSource, label) {
-  const vertex = compileShader(gl, gl.VERTEX_SHADER, FULLSCREEN_VERTEX_SHADER, `${label} vertex`);
+function createProgram(gl, fragmentSource, label, vertexSource = FULLSCREEN_VERTEX_SHADER) {
+  const vertex = compileShader(gl, gl.VERTEX_SHADER, vertexSource, `${label} vertex`);
   let fragment;
   let program;
   try {
@@ -163,7 +165,6 @@ class LabEngine {
     this.scene = {};
     this.tool = "paint";
     this.wallsRequested = false;
-    this.seedWalls = false;
     this.initializePhysics = false;
     this.running = false;
     this.destroyed = false;
@@ -177,6 +178,10 @@ class LabEngine {
     this.musicHue = null;
     this.musicHeat = 0;
     this.musicPuff = 0;
+    this.musicFlare = 0;
+    this.rays = null;
+    this.wallShadow = null;
+    this.wallVersion = 0;
     this.symmetryAngle = 0;
     this.automaticTime = 1;
     this.wispTime = 0;
@@ -226,7 +231,7 @@ class LabEngine {
 
   use(name) {
     if (!this.programs.has(name)) {
-      this.programs.set(name, createProgram(this.gl, OPTIONAL_SHADERS[name], name));
+      this.programs.set(name, createProgram(this.gl, OPTIONAL_SHADERS[name], name, name === "rays" ? RAY_VERTEX_SHADER : undefined));
     }
     const program = this.programs.get(name);
     this.gl.useProgram(program.handle);
@@ -236,8 +241,20 @@ class LabEngine {
       this.gl.uniform2f(this.uniform(program, "simTexel"), this.targets.velocity.texelX, this.targets.velocity.texelY);
       this.gl.uniform1f(this.uniform(program, "inflow"), this.config.inflow * this.velocityScale());
     }
+    if (program.uniforms.has("hole")) {
+      const hole = this.scene.hole ?? null;
+      const fit = this.holeFit();
+      this.gl.uniform3f(this.uniform(program, "hole"), hole?.x ?? 0, hole?.y ?? 0, (hole?.radius ?? 0) * fit);
+      this.gl.uniform2f(this.uniform(program, "holeSpin"), (hole?.spin ?? 0) * this.velocityScale() * fit, (hole?.disc ?? 1) * fit);
+      this.gl.uniform1f(this.uniform(program, "holeAspect"), this.canvas.width / this.canvas.height);
+      this.gl.uniform2f(this.uniform(program, "holeGlow"), (hole?.disc ?? 1) * fit, (hole?.glow ?? 0) * (1 + this.musicFlare));
+    }
     this.gl.uniform1f(this.uniform(program, "velocityScale"), this.velocityScale());
     return program;
+  }
+
+  holeFit() {
+    return Math.min(1, this.canvas.width / this.canvas.height);
   }
 
   velocityScale() {
@@ -339,6 +356,8 @@ class LabEngine {
   }
 
   deleteSimulationTargets() {
+    this.wallShadow = null;
+    this.wallVersion += 1;
     this.deleteDoubleTarget(this.targets.obstacles);
     this.deleteDoubleTarget(this.targets.temperature);
     this.targets.obstacles = null;
@@ -389,7 +408,7 @@ class LabEngine {
   allocateSimulationTargets(size) {
     const { gl } = this;
     this.deleteSimulationTargets();
-    this.wallsRequested = Boolean(this.seedWalls && this.scene.obstacles?.length);
+    this.wallsRequested = false;
     this.initializePhysics = true;
     try {
       this.targets.velocity = this.createDoubleTarget(size.width, size.height, gl.RG16F, gl.RG);
@@ -561,6 +580,7 @@ class LabEngine {
     this.deleteBloomTargets();
     this.deleteSunraysTargets();
     this.deletePrograms();
+    this.deleteRays();
     this.gl.deleteVertexArray(this.vao);
     this.touchPointers.clear();
     this.canvas.remove();
@@ -864,8 +884,8 @@ class LabEngine {
   reset(scene = this.scene) {
     this.scene = structuredClone(scene);
     this.sourceTime = 0;
-    this.wallsRequested = Boolean(this.scene.obstacles?.length);
-    this.seedWalls = this.wallsRequested;
+    this.wallsRequested = false;
+    this.deleteRays();
     this.deleteSimulationTargets();
     this.deleteDyeTargets();
     this.deleteBloomTargets();
@@ -928,7 +948,7 @@ class LabEngine {
     this.drawTo(velocity.write);
     velocity.swap();
 
-    if (this.hasBoundaries() || (temperature && this.config.buoyancy > 0)) {
+    if (this.hasBoundaries() || this.scene.hole || (temperature && this.config.buoyancy > 0)) {
       this.applyForces(dt);
     }
 
@@ -973,12 +993,6 @@ class LabEngine {
     }
     if (this.wallsRequested && !this.targets.obstacles) {
       this.targets.obstacles = this.createDoubleTarget(size.width, size.height, gl.RG8, gl.RG);
-      if (this.seedWalls) {
-        for (const shape of this.scene.obstacles ?? []) {
-          this.drawWall(shape.x, shape.y, shape.x, shape.y, shape.radius, true);
-        }
-        this.spreadWallReach();
-      }
     }
     const needsTemperature = this.config.heat > 0 || this.config.buoyancy > 0
       || this.config.flameShading || this.config.view === "temperature" || this.scene.emitters?.length;
@@ -1009,7 +1023,8 @@ class LabEngine {
     this.deleteDoubleTarget(this.targets.obstacles);
     this.targets.obstacles = null;
     this.wallsRequested = false;
-    this.seedWalls = false;
+    this.wallShadow = null;
+    this.wallVersion += 1;
   }
 
   drawWall(x0, y0, x1, y1, radius, value) {
@@ -1043,6 +1058,9 @@ class LabEngine {
     this.wallsRequested = true;
     this.ensurePhysicsTargets();
     this.drawWall(x0, y0, x1, y1, 0.01 + this.config.splatRadius * 0.03, value);
+    if (this.scene.rays) {
+      this.shadeWall(x0, y0, x1, y1, Math.max(0.01 + this.config.splatRadius * 0.03, this.targets.obstacles.texelY), value);
+    }
     this.spreadWallReach();
     for (const target of [this.targets.velocity, this.targets.dye, this.targets.temperature, this.targets.pressure]) {
       if (!target) {
@@ -1082,7 +1100,6 @@ class LabEngine {
     gl.uniform1f(this.uniform(program, "radius"), source.radius ?? 0.02);
     gl.uniform3f(this.uniform(program, "amount"), ...(source.amount ?? [source.heat ?? 0, 0, 0]));
     gl.uniform1f(this.uniform(program, "timeStep"), dt);
-    gl.uniform1f(this.uniform(program, "streamCount"), this.scene.streaklines ?? 0);
     gl.uniform1f(this.uniform(program, "aspectRatio"), this.canvas.width / this.canvas.height);
     this.drawTo(target.write);
     target.swap();
@@ -1109,8 +1126,121 @@ class LabEngine {
         this.applySource(this.targets.velocity, mode, { ...source, amount }, dt);
       }
     }
-    if (this.config.inflow > 0 && this.scene.streaklines) {
-      this.applySource(this.targets.dye, 2, {}, dt);
+    if (this.scene.rays && this.scene.hole) {
+      this.feedRays(dt);
+    }
+  }
+
+  deleteRays() {
+    if (this.rays) {
+      this.gl.deleteVertexArray(this.rays.shape);
+      this.gl.deleteBuffer(this.rays.buffer);
+      this.rays = null;
+    }
+  }
+
+  // Keeps a coarse copy of the painted walls so rays can stop at them.
+  shadeWall(x0, y0, x1, y1, radius, value) {
+    const size = WALL_SHADOW_SIZE;
+    this.wallShadow ??= new Uint8Array(size * size);
+    const aspect = this.canvas.width / this.canvas.height;
+    const ax = x0 * aspect;
+    const dx = x1 * aspect - ax;
+    const dy = y1 - y0;
+    const span = dx * dx + dy * dy;
+    const cell = index => Math.min(size - 1, Math.max(0, Math.floor(index * size)));
+    for (let row = cell(Math.min(y0, y1) - radius); row <= cell(Math.max(y0, y1) + radius); row += 1) {
+      for (let column = cell(Math.min(x0, x1) - radius / aspect); column <= cell(Math.max(x0, x1) + radius / aspect); column += 1) {
+        const px = (column + 0.5) / size * aspect - ax;
+        const py = (row + 0.5) / size - y0;
+        const along = span > 0 ? Math.min(1, Math.max(0, (px * dx + py * dy) / span)) : 0;
+        if (Math.hypot(px - dx * along, py - dy * along) <= radius) {
+          this.wallShadow[row * size + column] = value ? 1 : 0;
+        }
+      }
+    }
+    this.wallVersion += 1;
+  }
+
+  ensureRays() {
+    const { gl } = this;
+    const { hole, rays } = this.scene;
+    const key = [this.canvas.width, this.canvas.height, this.wallVersion].join();
+    if (this.rays?.key === key) {
+      return;
+    }
+    this.deleteRays();
+    const fit = this.holeFit();
+    const shadow = this.wallShadow;
+    const size = WALL_SHADOW_SIZE;
+    const { corners } = buildRays({
+      aspect: this.canvas.width / this.canvas.height,
+      x: hole.x,
+      y: hole.y,
+      radius: hole.radius * fit,
+      spacing: rays.spacing * Math.sqrt(fit),
+      blocked: shadow
+        ? (u, v) => u >= 0 && u < 1 && v >= 0 && v < 1 && shadow[Math.floor(v * size) * size + Math.floor(u * size)] === 1
+        : undefined,
+    });
+    const shape = gl.createVertexArray();
+    const buffer = gl.createBuffer();
+    gl.bindVertexArray(shape);
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, corners, gl.STATIC_DRAW);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 4, gl.FLOAT, false, 32, 0);
+    gl.enableVertexAttribArray(1);
+    gl.vertexAttribPointer(1, 4, gl.FLOAT, false, 32, 16);
+    gl.bindVertexArray(this.vao);
+    this.rays = { key, shape, buffer, count: corners.length / 8 };
+  }
+
+  drawRays(target, width, feed, gain) {
+    const { gl } = this;
+    const { rays } = this.scene;
+    this.ensureRays();
+    const program = this.use("rays");
+    gl.uniform3f(this.uniform(program, "rayLow"), ...rays.colors[0]);
+    gl.uniform3f(this.uniform(program, "rayHigh"), ...rays.colors[1]);
+    gl.uniform2f(this.uniform(program, "rayTravel"), this.sourceTime * rays.speed, rays.pulse);
+    gl.uniform1f(this.uniform(program, "rayWidth"), width);
+    gl.uniform1i(this.uniform(program, "rayScreen"), target ? 0 : 1);
+    gl.uniform1f(this.uniform(program, "rayFeed"), feed);
+    gl.uniform1f(this.uniform(program, "rayGain"), gain);
+    gl.bindVertexArray(this.rays.shape);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, target ? target.framebuffer : null);
+    gl.viewport(0, 0, target ? target.width : gl.drawingBufferWidth, target ? target.height : gl.drawingBufferHeight);
+    gl.enable(gl.BLEND);
+    if (target) {
+      gl.blendFuncSeparate(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA, gl.ZERO, gl.ONE);
+    } else {
+      gl.blendFuncSeparate(gl.ONE, gl.ONE, gl.ZERO, gl.ONE);
+    }
+    gl.drawArrays(gl.TRIANGLES, 0, this.rays.count);
+    gl.disable(gl.BLEND);
+    gl.bindVertexArray(this.vao);
+  }
+
+  // Near the hole the dye takes up the rays' light, and the swirl carries it
+  // round. The same light warms the fluid when there is a temperature field.
+  feedRays(dt) {
+    const { rays } = this.scene;
+    for (const target of [this.targets.dye.read, this.targets.temperature?.read]) {
+      if (target) {
+        const width = Math.max(rays.width, 1.5 * target.texelY);
+        // Wider or closer lines cover more of the fluid, so each one gives less.
+        const cover = Math.min(1, rays.width / width) * Math.sqrt(this.holeFit());
+        this.drawRays(target, width, 1 - Math.exp(-rays.hold * cover * dt), 1);
+      }
+    }
+  }
+
+  // The rays themselves are drawn over the picture, sharp at any dye resolution.
+  showRays(gain) {
+    if (this.scene.rays && this.scene.hole) {
+      const core = Math.max(this.scene.rays.width, 1.25 / this.gl.drawingBufferHeight);
+      this.drawRays(null, 4 * core, 0, gain);
     }
   }
 
@@ -1138,7 +1268,6 @@ class LabEngine {
     this.bindTexture(program, "temperatureField", temperature?.read ?? velocity.read, 1);
     gl.uniform1i(this.uniform(program, "hasTemperature"), temperature ? 1 : 0);
     gl.uniform1i(this.uniform(program, "initialize"), initialize ? 1 : 0);
-    gl.uniform1i(this.uniform(program, "wakeSeed"), this.scene.wakeSeed ? 1 : 0);
     const nozzle = this.scene.emitters?.find(emitter => emitter.throttle);
     gl.uniform2f(this.uniform(program, "nozzle"), nozzle?.x ?? 0, nozzle?.y ?? 0);
     gl.uniform1f(this.uniform(program, "jetMomentum"), nozzle ? this.config.throttle ** 3 : 0);
@@ -1226,11 +1355,12 @@ class LabEngine {
     this.ensureEffectTargets();
     if (this.config.view !== "dye") {
       this.renderField();
+      this.showRays(0.45);
       return;
     }
     const bloom = this.config.inverted ? null : this.renderBloom();
     const sunrays = this.config.inverted ? null : this.renderSunrays();
-    const program = this.use(this.targets.obstacles ? "wallDisplay" : "display");
+    const program = this.use(this.targets.obstacles || this.scene.hole ? "wallDisplay" : "display");
     const background = parseHexColor(this.config.backgroundColor);
     gl.disable(gl.BLEND);
     this.bindTexture(program, "dyeField", this.targets.dye.read, 0);
@@ -1253,6 +1383,7 @@ class LabEngine {
     gl.uniform1i(this.uniform(program, "useBloom"), bloom ? 1 : 0);
     gl.uniform1i(this.uniform(program, "useSunrays"), sunrays ? 1 : 0);
     this.drawTo(null);
+    this.showRays(1);
   }
 
   runFrame(dt, time) {
@@ -1264,6 +1395,7 @@ class LabEngine {
     this.musicHue = features ? response.hue : null;
     this.musicHeat = this.config.heat - settings.heat;
     this.musicPuff = features ? Math.max(0, this.musicPuff - dt) : 0;
+    this.musicFlare = features && this.musicMapping.flare && !settings.reduceFlashing ? Math.min(1, features.bass * settings.musicSensitivity) : 0;
     try {
       this.ensureTargets();
       this.updatePointerColors(dt);

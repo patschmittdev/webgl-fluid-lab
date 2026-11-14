@@ -47,7 +47,7 @@ export const CONTROL_HELP = Object.freeze({
   "[data-tool=\"paint\"]": "Drag to add dye and push the fluid. Key D.",
   "[data-tool=\"wall\"]": "Drag to draw solid walls the fluid has to go around. Key W.",
   "[data-tool=\"erase\"]": "Drag to rub out walls. Key E.",
-  "#clear-walls": "Remove every wall, including the preset's own shapes. Reset brings those back.",
+  "#clear-walls": "Remove every wall you have drawn.",
   "#pause": "Freeze the fluid. You can still paint. Key P.",
   "#splats": "Throw a burst of random splats. Key Space.",
   "#shot": "Save the current view as a PNG.",

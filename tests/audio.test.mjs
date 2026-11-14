@@ -115,7 +115,7 @@ test("every preset modulation stays in config ranges without changing saved sett
 
 test("preset mappings respond to the intended bands", () => {
   const levels = { bass: 1, mid: 1, overall: 1, timeSinceBeat: 1 };
-  for (const [id, key] of [["flame", "throttle"], ["smoke", "curl"], ["ink", "curl"], ["pavel", "curl"], ["tunnel", "inflow"], ["plume", "heat"]]) {
+  for (const [id, key] of [["flame", "throttle"], ["smoke", "curl"], ["ink", "curl"], ["pavel", "curl"], ["plume", "heat"]]) {
     const preset = PRESETS[id];
     const config = { ...PHYSICS_DEFAULTS, ...preset.config };
     assert.ok(modulateConfig(config, preset.music, levels)[key] > config[key], id);

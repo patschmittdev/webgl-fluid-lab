@@ -10,8 +10,15 @@ uniform bool hasSolids;
 uniform vec2 simTexel;
 uniform float inflow;
 uniform float velocityScale;
+uniform vec3 hole;
+uniform vec2 holeSpin;
+uniform float holeAspect;
 
 const float WALL_REACH = 8.0;
+
+bool inHole(vec2 p) {
+  return hole.z > 0.0 && length((p - hole.xy) * vec2(holeAspect, 1.0)) <= hole.z;
+}
 
 bool solid(vec2 p) {
   return hasSolids && textureLod(obstacleField, clamp(p, vec2(0.0), vec2(1.0)), 0.0).r > 0.5;
@@ -166,16 +173,20 @@ uniform float buoyancy;
 uniform float timeStep;
 uniform bool hasTemperature;
 uniform bool initialize;
-uniform bool wakeSeed;
 uniform vec2 nozzle;
 uniform float jetMomentum;
 uniform float jetSpeed;
 
 void main() {
   vec2 value = initialize ? vec2(inflow, 0.0) : texture(velocityField, uv).xy;
-  if (initialize && wakeSeed) {
-    vec2 offset = (uv - vec2(0.32, 0.515)) * vec2(simTexel.y / simTexel.x, 1.0);
-    value.y += 0.075 * velocityScale * exp(-dot(offset, offset) / 0.0004);
+  if (hole.z > 0.0) {
+    vec2 d = (uv - hole.xy) * vec2(holeAspect, 1.0);
+    float radial = length(d);
+    vec2 around = vec2(-d.y, d.x) / max(radial, 0.000001);
+    float inside = 1.0 - smoothstep(0.8 * holeSpin.y, 1.2 * holeSpin.y, radial);
+    float held = 1.0 - smoothstep(1.2 * holeSpin.y, 1.6 * holeSpin.y, radial);
+    float orbit = holeSpin.x * (radial < hole.z ? radial / hole.z : sqrt(hole.z / radial)) * inside;
+    value += around * (orbit - dot(value, around)) * (1.0 - exp(-20.0 * held * timeStep));
   }
   if (hasTemperature) {
     value.y += buoyancy * texture(temperatureField, uv).r * timeStep;
@@ -304,7 +315,6 @@ uniform vec2 sourceExtent;
 uniform float radius;
 uniform vec3 amount;
 uniform float timeStep;
-uniform float streamCount;
 uniform float aspectRatio;
 
 void main() {
@@ -325,12 +335,44 @@ void main() {
         value += amount * weight * timeStep;
       }
     }
-  } else if (sourceMode == 2 && uv.x < 2.0 * simTexel.x) {
-    float distanceToStream = abs(fract(uv.y * streamCount) - 0.5) / streamCount;
-    float stripe = 1.0 - smoothstep(0.001, max(0.002, 0.65 * simTexel.y), distanceToStream);
-    value = mix(vec3(0.15, 0.8, 1.0), vec3(1.0, 0.55, 0.15), uv.y) * stripe * 1.35;
   }
   outputColor = solid(uv) ? vec4(0.0) : vec4(value, 1.0);
+}
+`,
+  rays: `#version 300 es
+precision highp float;
+
+in vec2 place;
+in float side;
+in float travelled;
+in float tint;
+in float stop;
+out vec4 outputColor;
+uniform vec3 rayLow;
+uniform vec3 rayHigh;
+uniform vec2 rayTravel;
+uniform bool rayScreen;
+uniform float rayFeed;
+uniform float rayGain;
+uniform vec3 hole;
+uniform float holeAspect;
+uniform vec2 holeGlow;
+
+void main() {
+  float reach = min(rayTravel.x, stop);
+  float arrived = 1.0 - smoothstep(reach - 0.02, reach, travelled);
+  float wave = 1.0 - rayTravel.y * (0.5 + 0.5 * sin((travelled - rayTravel.x) * 14.0));
+  vec3 color = mix(rayLow, rayHigh, tint) * wave;
+  float across = abs(side);
+  float radial = length((place - hole.xy) * vec2(holeAspect, 1.0));
+  if (!rayScreen) {
+    float near = 1.0 - smoothstep(0.6 * holeGlow.x, 0.95 * holeGlow.x, radial);
+    outputColor = vec4(color, (1.0 - smoothstep(0.35, 1.0, across)) * arrived * near * rayFeed);
+  } else {
+    float line = 1.0 - smoothstep(0.1, 0.25, across) + 0.2 * pow(1.0 - across, 3.0);
+    float falling = smoothstep(1.02 * hole.z, 1.25 * hole.z, radial);
+    outputColor = vec4(color * line * arrived * falling * rayGain, 0.0);
+  }
 }
 `,
   maskQuantity: header + `
@@ -359,6 +401,9 @@ float solidCoverage() {
 }
 
 vec4 overlaySolid(vec4 color) {
+  if (inHole(uv)) {
+    return vec4(0.0, 0.0, 0.0, 1.0);
+  }
   float light = dot(background, vec3(0.2126, 0.7152, 0.0722));
   return mix(color, vec4(vec3(light > 0.4 ? 0.18 : 0.65), 1.0), solidCoverage());
 }
@@ -426,6 +471,9 @@ export function withSolidDisplay(source) {
   return source.replace("void main() {", `
 uniform sampler2D obstacleField;
 uniform bool hasSolids;
+uniform vec3 hole;
+uniform float holeAspect;
+uniform vec2 holeGlow;
 
 float solidCoverage() {
   if (!hasSolids) return 0.0;
@@ -449,6 +497,41 @@ void displayFluid() {`).replace(/}\s*$/, `}
 void main() {
   displayFluid();
   outputColor = overlaySolid(outputColor);
+  if (hole.z > 0.0) {
+    float radial = length((uv - hole.xy) * vec2(holeAspect, 1.0));
+    vec3 base = useTransparency ? vec3(0.0) : background;
+    vec3 lit = max(outputColor.rgb - base, vec3(0.0));
+    float light = dot(lit, vec3(0.2126, 0.7152, 0.0722));
+    float lightEnough = smoothstep(0.03, 0.15, light);
+    float warm = (1.0 - smoothstep(holeGlow.x, 1.3 * holeGlow.x, radial)) * lightEnough;
+    float heat = 1.0 - smoothstep(hole.z, holeGlow.x, radial);
+    heat *= heat * lightEnough;
+    lit = mix(lit, light * vec3(1.9, 0.9, 0.3), 0.8 * warm) * (1.0 + holeGlow.y * heat);
+    float edge = 0.02 * hole.z;
+    outputColor.rgb = (base + lit) * smoothstep(hole.z - edge, hole.z + edge, radial);
+  }
 }
 `);
 }
+
+export const RAY_VERTEX_SHADER = `#version 300 es
+precision highp float;
+
+layout(location = 0) in vec4 path;
+layout(location = 1) in vec4 detail;
+out vec2 place;
+out float side;
+out float travelled;
+out float tint;
+out float stop;
+uniform float rayWidth;
+
+void main() {
+  place = path.xy + path.zw * detail.x * rayWidth;
+  side = detail.x;
+  travelled = detail.y;
+  tint = detail.z;
+  stop = detail.w;
+  gl_Position = vec4(place * 2.0 - 1.0, 0.0, 1.0);
+}
+`;
