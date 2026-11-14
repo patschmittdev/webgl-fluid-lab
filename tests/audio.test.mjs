@@ -167,3 +167,15 @@ test("music and symmetry config validate and source data is discarded on import"
   const decoded = decodeShareState(encodeShareState({ preset: "collide", config: { ...config, audioSource: "tab", track: "private.mp3" }, source: "demo" }));
   assert.deepEqual(decoded, { preset: "collide", config, jet: false });
 });
+
+test("zero sensitivity returns the settings untouched for every preset", () => {
+  const features = { bass: 1, mid: 1, treble: 1, overall: 1, brightness: 1, beat: true, timeSinceBeat: 0 };
+  for (const preset of Object.values(PRESETS)) {
+    const config = { ...PHYSICS_DEFAULTS, ...preset.config, musicSensitivity: 0 };
+    assert.deepEqual(modulateConfig(config, preset.music, features, 1, 1), config);
+    const respond = createMusicResponse();
+    const response = respond(config, preset.music, features, 1);
+    assert.deepEqual(response.config, config);
+    assert.equal(response.burst, false);
+  }
+});

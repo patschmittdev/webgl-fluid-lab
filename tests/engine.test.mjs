@@ -570,3 +570,36 @@ test("drawing or erasing a wall refreshes the wall-reach mask in both directions
   engine.reset(PRESETS.tunnel.physics);
   assert.equal(draws.filter(program => program.uniforms.some(item => item.name === "axis")).length, 2, "seeded shapes get a reach mask too");
 });
+
+test("Ink's random splats and music bursts carry ink, not only motion", t => {
+  const { engine, uniforms } = fixture(t, PRESETS.ink.config);
+  engine.musicMapping = PRESETS.ink.music;
+  for (const inject of [() => engine.multipleSplats(4), () => engine.burstSplats(2)]) {
+    uniforms.length = 0;
+    inject();
+    const dye = uniforms.filter(item => item.name === "amount").filter((_, index) => index % 2 === 1);
+    assert.ok(dye.length > 0);
+    assert.ok(dye.every(item => item.value.some(channel => channel > 0.05)), "every splat absorbs some light");
+  }
+});
+
+test("zero music sensitivity leaves Collide as it is without music", t => {
+  const { engine } = fixture(t, { ...PRESETS.collide.config, musicSensitivity: 0 });
+  engine.musicMapping = PRESETS.collide.music;
+  const settings = structuredClone(engine.config);
+  let heard = 0;
+  engine.readMusic = () => {
+    heard += 1;
+    return { bass: 1, mid: 1, treble: 1, overall: 1, brightness: 1, beat: true, timeSinceBeat: 0 };
+  };
+  let automatic = 0;
+  engine.nextWisp = () => { automatic += 1; };
+  for (let i = 0; i < 80; i += 1) {
+    engine.runFrame(1 / 60, i / 60);
+  }
+  assert.equal(heard, 80, "the level meters still get readings");
+  assert.deepEqual(engine.musicDisplayConfig, settings);
+  assert.equal(engine.musicEnergy, null);
+  assert.equal(engine.musicHue, null);
+  assert.ok(automatic >= 1, "the pattern used without music keeps running");
+});

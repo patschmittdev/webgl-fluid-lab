@@ -34,7 +34,7 @@ Hover over any control, or focus it with the keyboard, for a one-line descriptio
 - **View**: dye, speed, vorticity, pressure or temperature. Glow applies to the dye view only.
 - **Pause, Splats, Screenshot, Reset**: Reset clears the fluid and restores the current preset's settings. Screenshot saves the current view as a PNG.
 - **Colour, Glow, Paint, Physics, Simulation**: sliders and toggles, collapsed by default. Symmetry in Paint gives any preset Collide's repeated splats.
-- **Share**: export or import settings as JSON, or copy a link that opens the lab with the same preset and settings. Drawn walls are not included.
+- **Share**: export or import the preset and settings as JSON, or copy a link that opens the lab with the same preset and settings. Drawn walls are not included.
 
 Settings from a link or a JSON file are checked before use: unknown keys are dropped, numbers are clamped to the slider ranges, and colours must be `#rrggbb`. Only the splat count is kept between visits (in `localStorage`); every visit starts on Pavel 2017.
 

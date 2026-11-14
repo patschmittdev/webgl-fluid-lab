@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { normalizeConfig, normalizeAutoSplats, encodeShareState, decodeShareState } from "../assets/config.js";
+import { normalizeConfig, normalizeAutoSplats, normalizeSharedState, encodeShareState, decodeShareState, MAX_PALETTE } from "../assets/config.js";
 import { PRESETS, PHYSICS_DEFAULTS, VIEWS } from "../assets/presets.js";
 
 test("unknown and prototype-shaped keys are dropped", () => {
@@ -115,5 +115,24 @@ test("every preset starts at the resolution maximums", () => {
     assert.equal(preset.config.simResolution, 512);
     assert.equal(preset.config.dyeResolution, 2048);
     assert.ok(preset.config.pressureIterations <= 50);
+  }
+});
+
+test("imported palettes are cut to the number of swatches the panel allows", () => {
+  const palette = normalizeConfig({ colorPalette: Array.from({ length: 100000 }, () => "#ffffff") }).colorPalette;
+  assert.equal(palette.length, MAX_PALETTE);
+  assert.deepEqual(normalizeConfig({ colorPalette: ["red", "#000000"] }), { colorPalette: ["#000000"] });
+});
+
+test("exported settings files load with their preset, and older flat files still load", () => {
+  const saved = { preset: "flame", config: { pressure: 0.5, flameShading: true }, jet: true, autoSplats: 3 };
+  assert.deepEqual(normalizeSharedState(JSON.parse(JSON.stringify(saved))), saved);
+  assert.deepEqual(normalizeSharedState({ pressure: 9, unknown: 1 }), { config: { pressure: 1 } });
+  assert.deepEqual(normalizeSharedState({ preset: "wick", config: {} }), { preset: "flame", config: {}, jet: false });
+  for (const preset of ["missing", "toString", "__proto__", 4, {}, null]) {
+    assert.equal(normalizeSharedState({ preset, config: {} }).preset, undefined);
+  }
+  for (const input of [null, [], "text", 4]) {
+    assert.equal(normalizeSharedState(input), null);
   }
 });

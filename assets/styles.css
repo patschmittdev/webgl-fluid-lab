@@ -227,6 +227,9 @@ button:hover, button:focus-visible {
   gap: 8px;
   margin-bottom: 12px;
 }
+.preset-grid > :last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
 .preset-grid [aria-pressed="true"] {
   border-color: var(--accent);
   color: var(--accent);

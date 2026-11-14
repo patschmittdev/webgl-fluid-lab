@@ -64,7 +64,7 @@ export const CONTROL_HELP = Object.freeze({
   "#backgroundColor": "Colour behind the dye.",
   "#jet": "Keep a steady stream of splats running. Key J.",
   "#autoSplats": "How many splats the Splats button and Space throw at once.",
-  "#export": "Save the current settings as a JSON file.",
+  "#export": "Save the current preset and settings as a JSON file.",
   "#copy-link": "Copy a link that opens the lab with these settings. Drawn walls are not included.",
-  "#import": "Load settings from a JSON file exported here.",
+  "#import": "Load a preset and settings from a JSON file exported here.",
 });

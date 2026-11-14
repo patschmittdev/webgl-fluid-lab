@@ -74,10 +74,10 @@ export function createAudioAnalysis() {
 }
 
 export function modulateConfig(config, mapping, features, bloomLevel = 0, energy = 0) {
-  if (!features) {
+  const sensitivity = config.musicSensitivity ?? 1;
+  if (!features || sensitivity === 0) {
     return { ...config };
   }
-  const sensitivity = config.musicSensitivity ?? 1;
   const bass = unit(features.bass * sensitivity);
   const mid = unit(features.mid * sensitivity);
   const overall = unit(features.overall * sensitivity);
@@ -95,9 +95,6 @@ export function modulateConfig(config, mapping, features, bloomLevel = 0, energy
   }
   if (mapping.throttle) {
     changes.throttle = mapping.throttle[0] + bass * (mapping.throttle[1] - mapping.throttle[0]) + kick * 0.12;
-    if (sensitivity === 0) {
-      changes.throttle = config.throttle;
-    }
   }
   if (mapping.curl) {
     changes.curl = (changes.curl ?? config.curl) + mid * mapping.curl;

@@ -790,7 +790,7 @@ class LabEngine {
   multipleSplats(count) {
     if (this.destroyed || !this.targets.velocity) return;
     for (let index = 0; index < count; index += 1) {
-      const color = this.generateColor().map((channel) => channel * 10);
+      const color = this.generateColor().map((channel) => this.config.inverted ? channel : channel * 10);
       this.injectNormalized(
         Math.random(),
         Math.random(),
@@ -810,7 +810,7 @@ class LabEngine {
     const aspect = this.canvas.width / this.canvas.height;
     const energy = this.musicEnergy;
     const spread = Math.min(1, 0.07 / Math.max(this.config.splatRadius, 0.01));
-    const gain = (energy === null ? 9 : 3 + 6 * energy) * spread * (soft ? 0.7 : 1);
+    const gain = this.config.inverted ? 1 : (energy === null ? 9 : 3 + 6 * energy) * spread * (soft ? 0.7 : 1);
     const saturation = energy === null ? 1 : 0.45 + 0.55 * energy;
     for (let index = 0; index < count; index += 1) {
       const angle = Math.PI / 2 + 0.24 + Math.random() * 0.1;
@@ -1257,10 +1257,11 @@ class LabEngine {
 
   runFrame(dt, time) {
     const settings = this.config;
-    const features = this.readMusic?.(time) ?? null;
+    const heard = this.readMusic?.(time) ?? null;
+    const features = settings.musicSensitivity > 0 ? heard : null;
     const response = this.musicResponse(settings, this.musicMapping, features, time);
     this.config = response.config;
-    this.musicHue = features && settings.musicSensitivity > 0 ? response.hue : null;
+    this.musicHue = features ? response.hue : null;
     this.musicHeat = this.config.heat - settings.heat;
     this.musicPuff = features ? Math.max(0, this.musicPuff - dt) : 0;
     try {

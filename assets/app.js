@@ -1,4 +1,4 @@
-import { normalizeConfig, normalizeAutoSplats, encodeShareState, decodeShareState } from "./config.js";
+import { normalizeConfig, normalizeAutoSplats, normalizeSharedState, encodeShareState, decodeShareState, MAX_PALETTE } from "./config.js";
 import createEngine from "./engines/lab.js";
 import { createMusicPlayer } from "./music.js";
 import { createResolutionMonitor, lowerResolutions } from "./resolution-monitor.js";
@@ -153,7 +153,8 @@ function applyPreset(name) {
 }
 
 function exportConfig() {
-  const blob = new Blob([JSON.stringify(state.config, null, 2)], {
+  const saved = { preset: state.preset, config: state.config, jet: state.jet, autoSplats: state.autoSplats };
+  const blob = new Blob([JSON.stringify(saved, null, 2)], {
     type: "application/json",
   });
   const url = URL.createObjectURL(blob);
@@ -169,14 +170,32 @@ function importConfig(file) {
   const reader = new FileReader();
   reader.onload = () => {
     try {
-      const config = JSON.parse(String(reader.result));
-      const saved = applyConfig(config, true);
+      const shared = normalizeSharedState(JSON.parse(String(reader.result)));
+      if (!shared) {
+        throw new Error("not a settings file");
+      }
+      if (shared.preset !== undefined) {
+        applyPreset(shared.preset);
+      }
+      const saved = applyConfig(keepReducedFlashing(shared.config), true);
+      if (shared.preset !== undefined) {
+        setJet(shared.jet);
+      }
+      if (shared.autoSplats !== undefined) {
+        state.autoSplats = shared.autoSplats;
+        persist();
+        syncForm();
+      }
       setStatus(saved ? `Imported ${file.name}` : `Imported ${file.name}, but could not save settings`);
     } catch {
       setStatus("Could not parse that JSON file");
     }
   };
   reader.readAsText(file);
+}
+
+function keepReducedFlashing(config) {
+  return matchMedia("(prefers-reduced-motion: reduce)").matches ? { ...config, reduceFlashing: true } : config;
 }
 
 function copyShareLink() {
@@ -199,7 +218,7 @@ function applyHashState() {
     state.preset = decoded.preset;
   }
   if (decoded.config) {
-    state.config = { ...PHYSICS_DEFAULTS, ...clone(currentPreset().config), reduceFlashing: state.config.reduceFlashing, ...decoded.config };
+    state.config = { ...PHYSICS_DEFAULTS, ...clone(currentPreset().config), reduceFlashing: state.config.reduceFlashing, ...keepReducedFlashing(decoded.config) };
   }
   if (decoded.autoSplats !== undefined) {
     state.autoSplats = decoded.autoSplats;
@@ -431,7 +450,7 @@ function syncPalette() {
     item.append(input, remove);
     container.append(item);
   });
-  document.querySelector("#add-swatch").disabled = palette.length >= 8;
+  document.querySelector("#add-swatch").disabled = palette.length >= MAX_PALETTE;
 }
 
 function dismissHint() {
@@ -556,7 +575,7 @@ function bindActions() {
     applyConfig({ backgroundColor: event.target.value });
   });
   document.querySelector("#add-swatch").addEventListener("click", () => {
-    if (state.config.colorPalette.length < 8) {
+    if (state.config.colorPalette.length < MAX_PALETTE) {
       applyConfig({ colorPalette: [...state.config.colorPalette, "#ffffff"] });
     }
   });

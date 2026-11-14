@@ -5,6 +5,7 @@ const PRESET_ALIASES = Object.freeze({
   paper: "ink",
 });
 const HEX_COLOR = /^#[0-9a-f]{6}$/i;
+export const MAX_PALETTE = 8;
 export const NUMBER_RANGES = new Map(
   NUMBER_FIELDS.map(([key, , min, max]) => [key, { min, max }]),
 );
@@ -56,9 +57,9 @@ export function normalizeConfig(input) {
       continue;
     }
     if (key === "colorPalette" && Array.isArray(value)) {
-      normalized[key] = value.filter(
+      normalized[key] = value.slice(0, 64).filter(
         (color) => typeof color === "string" && HEX_COLOR.test(color),
-      );
+      ).slice(0, MAX_PALETTE);
     }
   }
   return normalized;
@@ -87,23 +88,26 @@ export function decodeShareState(hashString) {
     if (!encoded) {
       return hash.has("s") || hash.has("c") ? null : {};
     }
-    const parsed = JSON.parse(decodeURIComponent(escape(atob(encoded))));
-    if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
-      return null;
-    }
-    if (!parsed.config) {
-      return { config: normalizeConfig(parsed) };
-    }
-    const result = { config: normalizeConfig(parsed.config), jet: Boolean(parsed.jet) };
-    parsed.preset = PRESET_ALIASES[parsed.preset] ?? parsed.preset;
-    if (typeof parsed.preset === "string" && Object.hasOwn(PRESETS, parsed.preset)) {
-      result.preset = parsed.preset;
-    }
-    if (parsed.autoSplats !== undefined) {
-      result.autoSplats = normalizeAutoSplats(parsed.autoSplats);
-    }
-    return result;
+    return normalizeSharedState(JSON.parse(decodeURIComponent(escape(atob(encoded)))));
   } catch {
     return null;
   }
+}
+
+export function normalizeSharedState(parsed) {
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+    return null;
+  }
+  if (!parsed.config) {
+    return { config: normalizeConfig(parsed) };
+  }
+  const result = { config: normalizeConfig(parsed.config), jet: Boolean(parsed.jet) };
+  const preset = typeof parsed.preset === "string" ? PRESET_ALIASES[parsed.preset] ?? parsed.preset : null;
+  if (preset !== null && Object.hasOwn(PRESETS, preset)) {
+    result.preset = preset;
+  }
+  if (parsed.autoSplats !== undefined) {
+    result.autoSplats = normalizeAutoSplats(parsed.autoSplats);
+  }
+  return result;
 }
