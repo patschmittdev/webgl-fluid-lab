@@ -24,7 +24,6 @@ The page needs WebGL2 and the `EXT_color_buffer_float` extension. Without them i
 - **Ink**: ink on a light page. Thin strokes make a wash and overlapping inks darken.
 - **Wind tunnel**: steady flow from left to right past a disc, with thin streams of dye to show the wake. Draw your own walls.
 - **Plume**: warm smoke rising from the bottom on buoyancy alone.
-- **Jupiter**: east and west jets by latitude, with a long-lived red storm held between two of them. The picture wraps around from one side of the screen to the other. Each latitude slowly re-supplies its own cloud colour, so the bands survive being stirred, and the colour you see is dye carried by the flow. The jet layout and colours are picked to look like the planet; this is not an atmosphere model.
 - **Collide**: every splat is repeated around the centre, rotated and mirrored, inside the simulation. Mirrored pairs of streams run into each other and shoot outward. It is built for music.
 
 ## Controls
@@ -59,7 +58,7 @@ Open Music and pick a source:
 - **Demo beat**: a generated drum loop, for trying it out.
 - **Choose a track**: an audio file from your computer. You can also drop one on the page.
 
-The page measures bass, mid and treble, finds beats, and follows how loud and busy the track is. Each preset responds in its own way: Collide fires its central ring on beats and drifts softer wisps in from the edges between them, Flame burns harder with the bass, Jupiter kicks up a storm on each beat. Stopping the music puts everything back.
+The page measures bass, mid and treble, finds beats, and follows how loud and busy the track is. Each preset responds in its own way: Collide fires its central ring on beats and drifts softer wisps in from the edges between them, Flame burns harder with the bass. Stopping the music puts everything back.
 
 No audio is bundled, uploaded or recorded, and the microphone is never used. **Reduce flashing** limits beat bursts to two a second and stops music from changing the glow. It starts switched on when the device asks for reduced motion.
 
@@ -69,7 +68,7 @@ Presets start at the highest resolution the sliders allow (simulation 512, dye 2
 
 ## How it works
 
-Each frame the solver moves velocity and dye along the flow, strengthens small swirls, solves for pressure, and removes the part of the velocity that would compress the fluid. Optional passes add heat and buoyancy, solid walls, a left-to-right inlet and outlet, and the forcing behind the Jupiter preset.
+Each frame the solver moves velocity and dye along the flow, strengthens small swirls, solves for pressure, and removes the part of the velocity that would compress the fluid. Optional passes add heat and buoyancy, solid walls and a left-to-right inlet and outlet.
 
 ```text
 index.html
@@ -85,7 +84,7 @@ assets/
   engines/
     lab.js                solver and GPU resources
     lab/shaders.js        core simulation and display shaders
-    lab/physics-shaders.js  walls, through-flow, heat, field views, Jupiter
+    lab/physics-shaders.js  walls, through-flow, heat, field views
 tests/
 ```
 

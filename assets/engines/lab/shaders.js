@@ -16,13 +16,6 @@ void main() {
 }
 `;
 
-export const HALF_FLOAT_ROUNDING = `
-vec4 roundToHalf(vec4 value, float threshold) {
-  vec4 unit = exp2(floor(log2(max(abs(value), vec4(0.00001)))) - 10.0);
-  return floor(value / unit + threshold) * unit * 1.00001;
-}
-`;
-
 const flameColor = `
 uniform sampler2D temperatureField;
 uniform bool flameShading;
@@ -66,8 +59,7 @@ uniform vec2 velocityTexel;
 uniform vec2 quantityTexel;
 uniform float timeStep;
 uniform float dissipation;
-uniform bool keepPrecision;
-${HALF_FLOAT_ROUNDING}
+
 vec4 sampleLinear(sampler2D field, vec2 position, vec2 texel) {
   vec2 gridPosition = position / texel - 0.5;
   vec2 cell = floor(gridPosition);
@@ -89,8 +81,8 @@ vec4 sampleLinear(sampler2D field, vec2 position, vec2 texel) {
 void main() {
   vec2 velocity = sampleLinear(velocityField, uv, velocityTexel).xy;
   vec2 departurePoint = uv - timeStep * velocity * velocityTexel;
-  vec4 transported = sampleLinear(quantityField, departurePoint, quantityTexel) / (1.0 + dissipation * timeStep);
-  outputColor = keepPrecision ? roundToHalf(transported, 0.5) : transported;
+  vec4 transported = sampleLinear(quantityField, departurePoint, quantityTexel);
+  outputColor = transported / (1.0 + dissipation * timeStep);
 }
 `,
 
@@ -158,7 +150,6 @@ out vec4 outputColor;
 
 uniform sampler2D velocityField;
 uniform vec2 texel;
-uniform bool wrapX;
 
 void main() {
   vec2 center = texture(velocityField, uv).xy;
@@ -167,8 +158,8 @@ void main() {
   vec2 bottomUv = uv - vec2(0.0, texel.y);
   vec2 topUv = uv + vec2(0.0, texel.y);
 
-  float left = !wrapX && leftUv.x < 0.0 ? -center.x : texture(velocityField, leftUv).x;
-  float right = !wrapX && rightUv.x > 1.0 ? -center.x : texture(velocityField, rightUv).x;
+  float left = leftUv.x < 0.0 ? -center.x : texture(velocityField, leftUv).x;
+  float right = rightUv.x > 1.0 ? -center.x : texture(velocityField, rightUv).x;
   float bottom = bottomUv.y < 0.0 ? -center.y : texture(velocityField, bottomUv).y;
   float top = topUv.y > 1.0 ? -center.y : texture(velocityField, topUv).y;
 
@@ -248,21 +239,13 @@ uniform vec3 amount;
 uniform bool inkMode;
 uniform float radius;
 uniform float aspectRatio;
-uniform bool wrapX;
-uniform float cover;
-uniform float swirl;
 
 void main() {
   vec2 offset = uv - center;
-  if (wrapX) {
-    offset.x = fract(offset.x + 0.5) - 0.5;
-  }
   offset.x *= aspectRatio;
   float influence = exp(-dot(offset, offset) / radius);
   vec3 existing = texture(targetField, uv).rgb;
-  vec3 push = amount + vec3(swirl * vec2(-offset.y, offset.x) / sqrt(radius), 0.0);
-  vec3 value = cover > 0.0 ? mix(existing, amount, min(1.0, influence * cover)) : existing + push * influence;
-  outputColor = vec4(value, inkMode ? texture(targetField, uv).a + influence : 1.0);
+  outputColor = vec4(existing + amount * influence, inkMode ? texture(targetField, uv).a + influence : 1.0);
 }
 `,
 

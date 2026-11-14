@@ -12,7 +12,6 @@ export const OPTIONAL_SHADERS = {
 };
 
 const MAX_TIME_STEP = 0.016666;
-const PLUME = Object.freeze([0.97, 0.95, 0.9]);
 
 const DEFAULT_CONFIG = Object.freeze({
   ...PHYSICS_DEFAULTS,
@@ -166,8 +165,6 @@ class LabEngine {
     this.wallsRequested = false;
     this.seedWalls = false;
     this.initializePhysics = false;
-    this.initializeDye = false;
-    this.stormTime = 0;
     this.running = false;
     this.destroyed = false;
     this.paused = false;
@@ -240,7 +237,6 @@ class LabEngine {
       this.gl.uniform1f(this.uniform(program, "inflow"), this.config.inflow * this.velocityScale());
     }
     this.gl.uniform1f(this.uniform(program, "velocityScale"), this.velocityScale());
-    this.gl.uniform1i(this.uniform(program, "wrapX"), this.scene.wrapX ? 1 : 0);
     return program;
   }
 
@@ -281,7 +277,7 @@ class LabEngine {
     gl.bindTexture(gl.TEXTURE_2D, texture);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filter);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filter);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, this.scene.wrapX ? gl.REPEAT : gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.texStorage2D(gl.TEXTURE_2D, 1, internalFormat, width, height);
 
@@ -409,7 +405,6 @@ class LabEngine {
   allocateDyeTargets(size) {
     const { gl } = this;
     this.deleteDyeTargets();
-    this.initializeDye = true;
     try {
       this.targets.dye = this.createDoubleTarget(size.width, size.height, gl.RGBA16F, gl.RGBA, gl.LINEAR);
     } catch (error) {
@@ -742,7 +737,7 @@ class LabEngine {
     }
   }
 
-  injectOne(x, y, dx, dy, color, withDye = true, swirl = 0) {
+  injectOne(x, y, dx, dy, color) {
     if (!this.targets.velocity || !this.targets.dye) return;
     if (x < 0 || x > 1 || y < 0 || y > 1) return;
     const { gl } = this;
@@ -758,24 +753,16 @@ class LabEngine {
     gl.uniform1f(this.uniform(program, "aspectRatio"), aspect);
     gl.uniform1f(this.uniform(program, "radius"), radius);
     gl.uniform1i(this.uniform(program, "inkMode"), 0);
-    gl.uniform1f(this.uniform(program, "cover"), 0);
-    gl.uniform1f(this.uniform(program, "swirl"), swirl * this.velocityScale());
     this.drawTo(this.targets.velocity.write);
     this.targets.velocity.swap();
-    if (!withDye) {
-      return;
-    }
 
     program = this.use(this.targets.obstacles ? "maskedSplat" : "splat");
     this.bindTexture(program, "targetField", this.targets.dye.read, 0);
     gl.uniform2f(this.uniform(program, "center"), x, y);
     const page = parseHexColor(this.config.backgroundColor);
     const ink = this.config.inverted;
-    const pigment = 0.92 / Math.max(color[0], color[1], color[2], 0.0001);
-    const amount = this.scene.planet ? color.map(channel => channel * pigment) : this.config.flameShading ? [1, 1, 1] : ink ? color.map((channel, i) => -Math.log(Math.max(0.001, Math.min(1, channel / Math.max(page[i], 0.001))))) : color;
+    const amount = this.config.flameShading ? [1, 1, 1] : ink ? color.map((channel, i) => -Math.log(Math.max(0.001, Math.min(1, channel / Math.max(page[i], 0.001))))) : color;
     gl.uniform1i(this.uniform(program, "inkMode"), ink ? 1 : 0);
-    gl.uniform1f(this.uniform(program, "cover"), this.scene.planet ? 0.7 : 0);
-    gl.uniform1f(this.uniform(program, "swirl"), 0);
     gl.uniform3f(this.uniform(program, "amount"), ...amount);
     gl.uniform1f(this.uniform(program, "aspectRatio"), aspect);
     gl.uniform1f(this.uniform(program, "radius"), radius);
@@ -877,10 +864,6 @@ class LabEngine {
   reset(scene = this.scene) {
     this.scene = structuredClone(scene);
     this.sourceTime = 0;
-    this.stormTime = 0;
-    this.renewalTime = 0;
-    this.renewalFrame = -1;
-    this.planetSeed = Math.random() * 100;
     this.wallsRequested = Boolean(this.scene.obstacles?.length);
     this.seedWalls = this.wallsRequested;
     this.deleteSimulationTargets();
@@ -903,7 +886,6 @@ class LabEngine {
     const physical = this.hasBoundaries();
     const program = this.use(physical ? "transport" : "advect");
     gl.uniform1i(this.uniform(program, "velocityMode"), source === this.targets.velocity.read ? 1 : 0);
-    gl.uniform1i(this.uniform(program, "keepPrecision"), this.scene.planet ? 1 : 0);
     this.bindTexture(program, "velocityField", velocity, 0);
     this.bindTexture(program, "quantityField", source, 1);
     gl.uniform2f(this.uniform(program, "velocityTexel"), this.targets.velocity.texelX, this.targets.velocity.texelY);
@@ -923,14 +905,6 @@ class LabEngine {
 
     this.advect(dye.read, dye.write, velocity.read, this.config.densityDissipation, dt);
     dye.swap();
-    if (this.scene.planet) {
-      this.renewalTime += dt;
-      this.renewalFrame = (this.renewalFrame + 1) % 3;
-      if (this.renewalFrame === 0) {
-        this.applyPlanet("planetDye", dye, this.renewalTime);
-        this.renewalTime = 0;
-      }
-    }
 
     const temperature = this.targets.temperature;
     if (temperature) {
@@ -956,9 +930,6 @@ class LabEngine {
 
     if (this.hasBoundaries() || (temperature && this.config.buoyancy > 0)) {
       this.applyForces(dt);
-    }
-    if (this.scene.planet) {
-      this.applyPlanet("planetFlow", velocity, dt);
     }
 
     program = this.use(this.hasBoundaries() ? "wallDivergence" : "divergence");
@@ -1022,54 +993,7 @@ class LabEngine {
       if (this.config.inflow > 0) {
         this.applyForces(0, true);
       }
-      if (this.scene.planet) {
-        this.applyPlanet("planetFlow", this.targets.velocity, 0, true);
-      }
     }
-    if (this.initializeDye && this.targets.dye) {
-      this.initializeDye = false;
-      if (this.scene.planet) {
-        this.applyPlanet("planetDye", this.targets.dye, 0, true);
-      }
-    }
-  }
-
-  applyPlanet(name, target, dt, initialize = false) {
-    const { gl } = this;
-    const { speed, spot, hold, renewal, view } = this.scene.planet;
-    const program = this.use(name);
-    this.bindTexture(program, name === "planetDye" ? "dyeField" : "velocityField", target.read, 0);
-    const drifted = spot.x - spot.drift * (this.sourceTime ?? 0);
-    const aspect = this.canvas.width / this.canvas.height;
-    const fit = Math.min(1, aspect / 1.2);
-    gl.uniform1f(this.uniform(program, "aspectRatio"), aspect);
-    gl.uniform3f(this.uniform(program, "spot"), drifted - Math.floor(drifted), spot.y, spot.speed * this.velocityScale());
-    gl.uniform2f(this.uniform(program, "spotSize"), spot.width * fit, spot.height * fit);
-    gl.uniform1f(this.uniform(program, "timeStep"), dt);
-    gl.uniform1i(this.uniform(program, "initialize"), initialize ? 1 : 0);
-    gl.uniform1f(this.uniform(program, "seed"), this.planetSeed);
-    gl.uniform1f(this.uniform(program, "dither"), Math.random() * 6.2831853);
-    gl.uniform1f(this.uniform(program, "clock"), this.sourceTime ?? 0);
-    gl.uniform1f(this.uniform(program, "stream"), speed * this.velocityScale() / this.targets.velocity.width);
-    gl.uniform1f(this.uniform(program, "jetSpeed"), speed * this.velocityScale());
-    gl.uniform2f(this.uniform(program, "hold"), ...hold);
-    gl.uniform2f(this.uniform(program, "view"), view.latitude, view.span);
-    gl.uniform2f(this.uniform(program, "renewal"), ...renewal);
-    this.drawTo(target.write);
-    target.swap();
-  }
-
-  planetStorm() {
-    const { speed, spot } = this.scene.planet;
-    const radius = this.config.splatRadius;
-    const wake = Math.random() < 0.5;
-    const plume = Math.random() < (wake ? 0.6 : 0.2);
-    const x = wake ? spot.x - 0.06 - 0.3 * Math.random() : Math.random();
-    const y = wake ? spot.y + 0.1 + 0.14 * Math.random() : 0.06 + 0.88 * Math.random();
-    this.config.splatRadius = radius * (plume ? 0.02 + 0.04 * Math.random() : 0.02 + 0.07 * Math.random());
-    const spin = speed * (3 + 5 * Math.random()) * (Math.random() < 0.5 ? -1 : 1);
-    this.injectOne(x - Math.floor(x), y, 0, 0, PLUME, plume, spin);
-    this.config.splatRadius = radius;
   }
 
   setTool(tool) {
@@ -1136,8 +1060,6 @@ class LabEngine {
     const program = this.use(this.targets.obstacles ? "maskedSplat" : "splat");
     this.bindTexture(program, "targetField", target.read, 0);
     gl.uniform1i(this.uniform(program, "inkMode"), 0);
-    gl.uniform1f(this.uniform(program, "cover"), 0);
-    gl.uniform1f(this.uniform(program, "swirl"), 0);
     gl.uniform2f(this.uniform(program, "center"), x, y);
     gl.uniform3f(this.uniform(program, "amount"), ...amount);
     gl.uniform1f(this.uniform(program, "aspectRatio"), this.canvas.width / this.canvas.height);
@@ -1190,10 +1112,6 @@ class LabEngine {
     if (this.config.inflow > 0 && this.scene.streaklines) {
       this.applySource(this.targets.dye, 2, {}, dt);
     }
-  }
-
-  flameShaded() {
-    return Boolean(this.config.flameShading) && !this.scene.planet;
   }
 
   emitterSource(emitter) {
@@ -1255,7 +1173,7 @@ class LabEngine {
     let program = this.use("bloomPrefilter");
     this.bindTexture(program, "dyeField", this.targets.dye.read, 0);
     this.bindTexture(program, "temperatureField", this.targets.temperature?.read ?? this.targets.dye.read, 3);
-    gl.uniform1i(this.uniform(program, "flameShading"), this.flameShaded() ? 1 : 0);
+    gl.uniform1i(this.uniform(program, "flameShading"), this.config.flameShading ? 1 : 0);
     gl.uniform1f(this.uniform(program, "threshold"), this.config.bloomThreshold);
     gl.uniform1f(this.uniform(program, "softKnee"), this.config.bloomSoftKnee);
     this.drawTo(chain[0].read);
@@ -1326,10 +1244,10 @@ class LabEngine {
     gl.uniform3f(this.uniform(program, "background"), background[0], background[1], background[2]);
     gl.uniform1f(this.uniform(program, "bloomIntensity"), this.config.bloomIntensity);
     gl.uniform1f(this.uniform(program, "sunraysWeight"), this.config.sunraysWeight);
-    gl.uniform1i(this.uniform(program, "useInk"), this.config.inverted && !this.scene.planet ? 1 : 0);
+    gl.uniform1i(this.uniform(program, "useInk"), this.config.inverted ? 1 : 0);
     this.bindTexture(program, "temperatureField", this.targets.temperature?.read ?? this.targets.dye.read, 3);
     gl.uniform1i(this.uniform(program, "warmSmoke"), this.scene.emitters?.length && !this.config.flameShading ? 1 : 0);
-    gl.uniform1i(this.uniform(program, "flameShading"), this.flameShaded() ? 1 : 0);
+    gl.uniform1i(this.uniform(program, "flameShading"), this.config.flameShading ? 1 : 0);
     gl.uniform1i(this.uniform(program, "useShading"), this.config.shading ? 1 : 0);
     gl.uniform1i(this.uniform(program, "useTransparency"), this.config.transparent ? 1 : 0);
     gl.uniform1i(this.uniform(program, "useBloom"), bloom ? 1 : 0);
@@ -1342,7 +1260,7 @@ class LabEngine {
     const features = this.readMusic?.(time) ?? null;
     const response = this.musicResponse(settings, this.musicMapping, features, time);
     this.config = response.config;
-    this.musicHue = features && settings.musicSensitivity > 0 && !this.scene.planet ? response.hue : null;
+    this.musicHue = features && settings.musicSensitivity > 0 ? response.hue : null;
     this.musicHeat = this.config.heat - settings.heat;
     this.musicPuff = features ? Math.max(0, this.musicPuff - dt) : 0;
     try {
@@ -1375,13 +1293,6 @@ class LabEngine {
         }
         if (response.burst && this.musicMapping.puff) {
           this.musicPuff = 0.2;
-        }
-        if (this.scene.planet) {
-          this.stormTime += dt;
-          if (this.stormTime >= this.scene.planet.storms || (response.burst && this.musicMapping.storms)) {
-            this.stormTime = 0;
-            this.planetStorm();
-          }
         }
         if (!features && this.musicMapping.automatic) {
           this.automaticTime += dt;

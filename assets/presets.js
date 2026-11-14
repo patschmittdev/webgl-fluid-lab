@@ -221,38 +221,6 @@ export const PRESETS = {
   },
 };
 
-PRESETS.jupiter = {
-  music: { storms: true },
-  label: "Jupiter",
-  note: "Jupiter's red storm, held between winds blowing east and west. Paint to stir the clouds.",
-  startJet: false,
-  physics: {
-    wrapX: true,
-    planet: {
-      view: { latitude: -22.5, span: 56 },
-      speed: 20,
-      hold: [0.3, 4],
-      renewal: [0.08, 0.5],
-      storms: 0.2,
-      spot: { x: 0.5, y: 0.5, width: 0.128, height: 0.098, speed: 22, drift: 0 },
-    },
-  },
-  config: {
-    ...base,
-    ...PHYSICS_DEFAULTS,
-    densityDissipation: 0,
-    velocityDissipation: 0,
-    pressure: 0.8,
-    curl: 0,
-    splatRadius: 0.1,
-    splatForce: 2500,
-    colorPalette: ["#f2e3c6", "#ffffff", "#c98f5a", "#8a4b2a"],
-    brightness: 1,
-    shading: false,
-    backgroundColor: "#07080c",
-  },
-};
-
 PRESETS.collide = {
   label: "Collide",
   note: "Mirrored pairs of streams collide and shoot outward. Play music or watch.",

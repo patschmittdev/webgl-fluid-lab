@@ -1,5 +1,3 @@
-import { HALF_FLOAT_ROUNDING } from "./shaders.js";
-
 const header = `#version 300 es
 precision highp float;
 precision highp int;
@@ -12,7 +10,6 @@ uniform bool hasSolids;
 uniform vec2 simTexel;
 uniform float inflow;
 uniform float velocityScale;
-uniform bool wrapX;
 
 const float WALL_REACH = 8.0;
 
@@ -22,7 +19,7 @@ bool solid(vec2 p) {
 
 bool wall(vec2 p) {
   return p.y < 0.0 || p.y > 1.0
-    || (inflow <= 0.0 && !wrapX && (p.x < 0.0 || p.x > 1.0)) || solid(p);
+    || (inflow <= 0.0 && (p.x < 0.0 || p.x > 1.0)) || solid(p);
 }
 
 bool clearPath(vec2 start, vec2 finish) {
@@ -97,60 +94,6 @@ vec2 boundedVelocity(vec2 value) {
 }
 `;
 
-const planet = `
-uniform float aspectRatio;
-uniform vec3 spot;
-uniform vec2 spotSize;
-uniform float timeStep;
-uniform bool initialize;
-uniform float seed;
-uniform vec2 view;
-
-float latitude(float y) {
-  return view.x + (y - 0.5) * view.y;
-}
-
-float bump(float lat, float centre, float halfWidth) {
-  float d = (lat - centre) / halfWidth;
-  return exp(-d * d);
-}
-
-float jet(float lat) {
-  return bump(lat, 0.0, 8.0)
-    - 0.35 * bump(lat, 16.5, 3.0) + 0.9 * bump(lat, 23.5, 2.6) - 0.3 * bump(lat, 31.0, 3.0)
-    + 0.4 * bump(lat, 36.5, 2.5) - 0.2 * bump(lat, 42.0, 2.5) + 0.25 * bump(lat, 47.0, 2.5)
-    - 0.55 * bump(lat, -16.5, 3.2) + 0.5 * bump(lat, -28.5, 3.0) - 0.25 * bump(lat, -34.5, 2.6)
-    + 0.4 * bump(lat, -39.5, 2.5) - 0.2 * bump(lat, -44.5, 2.5) + 0.25 * bump(lat, -49.0, 2.5);
-}
-
-vec2 spotOffset(vec2 p) {
-  return vec2((fract(p.x - spot.x + 0.5) - 0.5) * aspectRatio, p.y - spot.y) / spotSize;
-}
-
-float planetHash(vec2 p) {
-  return fract(sin(dot(p, vec2(127.1, 311.7)) + seed) * 43758.5453);
-}
-
-float planetNoise(vec2 p, float period) {
-  vec2 cell = floor(p);
-  vec2 f = fract(p);
-  f = f * f * (3.0 - 2.0 * f);
-  float x0 = mod(cell.x, period);
-  float x1 = mod(cell.x + 1.0, period);
-  float bottom = mix(planetHash(vec2(x0, cell.y)), planetHash(vec2(x1, cell.y)), f.x);
-  float top = mix(planetHash(vec2(x0, cell.y + 1.0)), planetHash(vec2(x1, cell.y + 1.0)), f.x);
-  return mix(bottom, top, f.y);
-}
-`;
-
-const plain = `#version 300 es
-precision highp float;
-precision highp sampler2D;
-
-in vec2 uv;
-out vec4 outputColor;
-`;
-
 const pressureNeighbors = `
 uniform sampler2D pressureField;
 
@@ -173,8 +116,7 @@ uniform vec2 quantityTexel;
 uniform float timeStep;
 uniform float dissipation;
 uniform bool velocityMode;
-uniform bool keepPrecision;
-${HALF_FLOAT_ROUNDING}
+
 vec4 sampleQuantity(vec2 position) {
   vec2 grid = position / quantityTexel - 0.5;
   vec2 cell = floor(grid);
@@ -188,15 +130,9 @@ vec4 sampleQuantity(vec2 position) {
         float weight = (x == 0 ? 1.0 - fraction.x : fraction.x)
           * (y == 0 ? 1.0 - fraction.y : fraction.y);
         ivec2 size = textureSize(quantityField, 0);
-        ivec2 index = ivec2(floor(point / quantityTexel));
-        if (wrapX) {
-          index.x = int(mod(float(index.x), float(size.x)));
-        }
-        index = clamp(index, ivec2(0), size - 1);
-        if (!(wrapX && solid((vec2(index) + 0.5) * quantityTexel))) {
-          value += texelFetch(quantityField, index, 0) * weight;
-          total += weight;
-        }
+        ivec2 index = clamp(ivec2(floor(point / quantityTexel)), ivec2(0), size - 1);
+        value += texelFetch(quantityField, index, 0) * weight;
+        total += weight;
       }
     }
   }
@@ -220,7 +156,7 @@ void main() {
   if (velocityMode) {
     value.xy = boundedVelocity(value.xy);
   }
-  outputColor = keepPrecision ? roundToHalf(value, 0.5) : value;
+  outputColor = value;
 }
 `,
   forces: header + `
@@ -327,112 +263,6 @@ void main() {
   outputColor = vec4(distanceToStroke <= radius ? value : mask, 0.0, 0.0, 1.0);
 }
 `,
-  planetFlow: plain + planet + `
-uniform sampler2D velocityField;
-uniform float jetSpeed;
-uniform vec2 hold;
-
-void main() {
-  vec2 velocity = texture(velocityField, uv).xy;
-  vec2 target = vec2(jet(latitude(uv.y)) * jetSpeed, 0.0);
-  vec2 d = spotOffset(uv);
-  float q = length(d);
-  vec2 swirl = spot.z * 2.02 * exp(-pow(q / 0.9, 4.0)) * vec2(-d.y, d.x * spotSize.y / spotSize.x);
-  float inside = 1.0 - smoothstep(0.9, 1.3, q);
-  target = mix(target, swirl, inside);
-  if (initialize) {
-    velocity = target;
-    velocity.y += 0.08 * jetSpeed * (planetNoise(uv * vec2(24.0, 14.0), 24.0) - 0.5);
-  } else {
-    velocity += (target - velocity) * (1.0 - exp(-mix(hold.x, hold.y, inside) * timeStep));
-  }
-  outputColor = vec4(velocity, 0.0, 1.0);
-}
-`,
-  planetDye: plain + planet + HALF_FLOAT_ROUNDING + `
-uniform sampler2D dyeField;
-uniform vec2 renewal;
-uniform float dither;
-uniform float clock;
-uniform float stream;
-
-vec3 layer(vec3 colour, float lat, float centre, float halfWidth, vec3 tint) {
-  float d = (lat - centre) / halfWidth;
-  return mix(colour, tint, exp(-d * d * d * d));
-}
-
-vec3 clouds(float lat) {
-  vec3 colour = vec3(0.93, 0.87, 0.74);
-  colour = mix(colour, vec3(0.84, 0.80, 0.72), 0.6 * bump(lat, 0.0, 5.0));
-  colour = layer(colour, lat, 12.0, 5.0, vec3(0.62, 0.36, 0.21));
-  colour = layer(colour, lat, -12.0, 5.5, vec3(0.58, 0.37, 0.24));
-  colour = layer(colour, lat, 27.5, 3.0, vec3(0.70, 0.50, 0.34));
-  colour = layer(colour, lat, -32.0, 3.2, vec3(0.66, 0.50, 0.38));
-  colour = layer(colour, lat, 38.5, 2.6, vec3(0.62, 0.52, 0.42));
-  colour = layer(colour, lat, -41.0, 2.6, vec3(0.60, 0.52, 0.44));
-  colour = mix(colour, vec3(0.50, 0.45, 0.41), smoothstep(40.0, 54.0, abs(lat)));
-  float stripes = 0.5 * sin(lat * 1.9) + 0.3 * sin(lat * 4.3 + 1.0) + 0.2 * sin(lat * 9.1 + 2.0);
-  colour *= 1.0 + 0.09 * stripes;
-  return colour * mix(vec3(1.0), vec3(1.05, 0.97, 0.88), 0.5 + 0.5 * sin(lat * 2.7 + 0.6));
-}
-
-vec3 weather(vec2 p, float lat, float age) {
-  float x = p.x - jet(lat) * stream * age;
-  float streaks = planetNoise(vec2(x * 5.0, p.y * 46.0), 5.0) - 0.5;
-  float grain = planetNoise(vec2(x * 18.0, p.y * 150.0), 18.0) - 0.5;
-  float threads = planetNoise(vec2(x * 9.0, p.y * 84.0), 9.0) - 0.5;
-  return clouds(lat + 0.035 * view.y * streaks + 0.012 * view.y * threads) * (1.0 + 0.3 * grain + 0.2 * threads + 0.12 * streaks);
-}
-
-vec2 eddies(vec2 p) {
-  for (float index = 0.0; index < 14.0; index += 1.0) {
-    vec2 centre = vec2(planetHash(vec2(index, 1.0)), 0.08 + 0.84 * planetHash(vec2(index, 2.0)));
-    float size = 0.025 + 0.05 * planetHash(vec2(index, 3.0));
-    vec2 offset = vec2((fract(p.x - centre.x + 0.5) - 0.5) * aspectRatio, p.y - centre.y);
-    float turn = (planetHash(vec2(index, 4.0)) < 0.5 ? -5.0 : 5.0) * exp(-dot(offset, offset) / (size * size));
-    vec2 turned = vec2(cos(turn) * offset.x - sin(turn) * offset.y, sin(turn) * offset.x + cos(turn) * offset.y);
-    p = vec2(centre.x + turned.x / aspectRatio, centre.y + turned.y);
-  }
-  return p;
-}
-
-void main() {
-  vec3 dye = texture(dyeField, uv).rgb;
-  vec2 d = spotOffset(uv);
-  float q = length(d);
-  float body = 1.0 - smoothstep(0.6, 0.85, q);
-  float core = exp(-q * q * 6.0);
-  float collar = smoothstep(0.92, 1.05, q) * (1.0 - smoothstep(1.15, 1.4, q));
-  vec3 cream = vec3(0.95, 0.91, 0.82);
-  vec3 salmon = vec3(0.85, 0.50, 0.33);
-  vec3 red = vec3(0.70, 0.27, 0.15);
-  if (initialize) {
-    vec2 p = eddies(uv);
-    float lat = latitude(p.y);
-    float blotch = planetNoise(vec2(p.x * 26.0, p.y * 30.0), 26.0) - 0.5;
-    vec3 sky = weather(p, lat + 0.02 * view.y * blotch, 0.0);
-    float rings = 0.5 + 0.5 * sin(3.0 * atan(d.y, d.x) + 11.0 * q);
-    vec3 storm = mix(mix(salmon, red, exp(-q * q * 4.0)), red, 0.35 * rings * smoothstep(0.15, 0.5, q));
-    sky = mix(sky, cream, collar);
-    dye = mix(sky, storm, 1.0 - smoothstep(0.8, 0.95, q));
-  } else {
-    float lat = latitude(uv.y);
-    float first = fract(clock / 40.0);
-    float second = fract(clock / 40.0 + 0.5);
-    vec3 sky = mix(weather(uv, lat, second * 40.0), weather(uv, lat, first * 40.0), abs(1.0 - 2.0 * second));
-    vec2 off = abs(d) - vec2(0.42, 0.0);
-    float arm = exp(-dot(off, off) * 22.0);
-    bool dark = fract(clock / 2.6 + (d.x < 0.0 ? 0.5 : 0.0)) < 0.5;
-    vec3 pulse = dark ? vec3(0.52, 0.16, 0.09) : vec3(0.94, 0.66, 0.46);
-    vec3 target = mix(mix(mix(mix(sky, cream, collar), salmon, body), red, core), pulse, arm);
-    float rate = mix(renewal.x, 0.5 * renewal.y, collar);
-    rate = mix(mix(mix(rate, 0.25 * renewal.y, body), renewal.y, core), 2.0 * renewal.y, arm);
-    dye += (target - dye) * (1.0 - exp(-rate * timeStep));
-  }
-  float threshold = fract(sin(dot(gl_FragCoord.xy, vec2(12.9898, 78.233)) + dither) * 43758.5453);
-  outputColor = roundToHalf(vec4(dye, 1.0), threshold);
-}
-`,
   wallReach: header + `
 uniform vec2 axis;
 
@@ -455,22 +285,14 @@ uniform vec3 amount;
 uniform bool inkMode;
 uniform float radius;
 uniform float aspectRatio;
-uniform float cover;
-uniform float swirl;
 
 void main() {
-  vec2 offset = uv - center;
-  if (wrapX) {
-    offset.x = fract(offset.x + 0.5) - 0.5;
-  }
-  offset.x *= aspectRatio;
+  vec2 offset = (uv - center) * vec2(aspectRatio, 1.0);
   float influence = exp(-dot(offset, offset) / radius);
   if (influence < 0.00001 || !clearPath(center, uv)) {
     influence = 0.0;
   }
-  vec3 existing = texture(targetField, uv).rgb;
-  vec3 push = amount + vec3(swirl * vec2(-offset.y, offset.x) / sqrt(radius), 0.0);
-  vec3 value = cover > 0.0 ? mix(existing, amount, min(1.0, influence * cover)) : existing + push * influence;
+  vec3 value = texture(targetField, uv).rgb + amount * influence;
   outputColor = solid(uv) ? vec4(0.0) : vec4(value, inkMode ? texture(targetField, uv).a + influence : 1.0);
 }
 `,

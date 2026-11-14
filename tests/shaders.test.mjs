@@ -7,8 +7,8 @@ const TYPES = "void|bool|int|float|vec2|vec3|vec4|ivec2|ivec3|ivec4|mat2|mat3|ma
 const LANGUAGE = new Set([
   ...TYPES.split("|"),
   "if", "for", "while", "return", "layout",
-  "abs", "all", "any", "atan", "clamp", "cos", "cross", "distance", "dot", "equal", "exp", "exp2", "floor", "fract",
-  "length", "lessThan", "log", "log2", "max", "min", "mix", "mod", "normalize", "pow", "sign", "sin", "smoothstep", "sqrt", "step",
+  "abs", "all", "any", "atan", "clamp", "cos", "cross", "distance", "dot", "equal", "exp", "floor", "fract",
+  "length", "lessThan", "log", "max", "min", "mix", "mod", "normalize", "pow", "sign", "sin", "smoothstep", "sqrt", "step",
   "texelFetch", "texture", "textureLod", "textureSize",
 ]);
 
