@@ -16,6 +16,35 @@ void main() {
 }
 `;
 
+const flameColor = `
+uniform sampler2D temperatureField;
+uniform bool flameShading;
+
+float flameTemperature(vec2 position) {
+  vec2 size = vec2(textureSize(temperatureField, 0));
+  vec2 grid = position * size - 0.5;
+  vec2 cell = floor(grid);
+  vec2 weight = fract(grid);
+  vec2 a = (cell + 0.5) / size;
+  vec2 d = 1.0 / size;
+  float bottom = mix(texture(temperatureField, a).r, texture(temperatureField, a + vec2(d.x, 0.0)).r, weight.x);
+  float top = mix(texture(temperatureField, a + vec2(0.0, d.y)).r, texture(temperatureField, a + d).r, weight.x);
+  return max(mix(bottom, top, weight.y), 0.0);
+}
+
+vec3 shadeFlame(vec3 fuel, vec2 position) {
+  float heat = flameTemperature(position);
+  float density = max(fuel.r, max(fuel.g, fuel.b));
+  float opacity = 1.0 - exp(-density * 2.0);
+  vec3 ramp = mix(vec3(0.25, 0.005, 0.0), vec3(1.2, 0.18, 0.005), smoothstep(0.2, 0.6, heat));
+  ramp = mix(ramp, vec3(1.6, 1.0, 0.08), smoothstep(0.6, 1.1, heat));
+  ramp = mix(ramp, vec3(1.9, 1.8, 1.5), smoothstep(1.1, 1.6, heat));
+  ramp = mix(ramp, vec3(0.25, 0.6, 1.7), smoothstep(2.2, 3.0, heat));
+  ramp = mix(ramp, vec3(0.55, 0.85, 1.9), smoothstep(3.2, 4.4, heat));
+  return mix(vec3(0.24), ramp, smoothstep(0.12, 0.35, heat)) * opacity;
+}
+`;
+
 export const FRAGMENT_SHADERS = {
   advect: `#version 300 es
 precision highp float;
@@ -91,6 +120,7 @@ uniform sampler2D curlField;
 uniform vec2 texel;
 uniform float strength;
 uniform float timeStep;
+uniform float velocityScale;
 
 void main() {
   float leftMagnitude = abs(texture(curlField, uv - vec2(texel.x, 0.0)).r);
@@ -107,7 +137,7 @@ void main() {
 
   vec2 force = strength * localCurl * vec2(magnitudeGradient.x, -magnitudeGradient.y);
   vec2 velocity = texture(velocityField, uv).xy + force * timeStep;
-  outputColor = vec4(clamp(velocity, vec2(-1000.0), vec2(1000.0)), 0.0, 1.0);
+  outputColor = vec4(clamp(velocity, vec2(-1000.0 * velocityScale), vec2(1000.0 * velocityScale)), 0.0, 1.0);
 }
 `,
 
@@ -206,6 +236,7 @@ out vec4 outputColor;
 uniform sampler2D targetField;
 uniform vec2 center;
 uniform vec3 amount;
+uniform bool inkMode;
 uniform float radius;
 uniform float aspectRatio;
 
@@ -214,7 +245,7 @@ void main() {
   offset.x *= aspectRatio;
   float influence = exp(-dot(offset, offset) / radius);
   vec3 existing = texture(targetField, uv).rgb;
-  outputColor = vec4(existing + amount * influence, 1.0);
+  outputColor = vec4(existing + amount * influence, inkMode ? texture(targetField, uv).a + influence : 1.0);
 }
 `,
 
@@ -228,9 +259,13 @@ out vec4 outputColor;
 uniform sampler2D dyeField;
 uniform float threshold;
 uniform float softKnee;
+${flameColor}
 
 void main() {
   vec3 source = max(texture(dyeField, uv).rgb, vec3(0.0));
+  if (flameShading) {
+    source = shadeFlame(source, uv);
+  }
   float peak = max(source.r, max(source.g, source.b));
   float kneeWidth = max(threshold * softKnee, 0.0001);
   float transition = clamp(
@@ -354,34 +389,56 @@ uniform vec2 texel;
 uniform vec3 background;
 uniform float bloomIntensity;
 uniform float sunraysWeight;
+uniform bool useInk;
+uniform bool warmSmoke;
 uniform bool useShading;
 uniform bool useTransparency;
 uniform bool useBloom;
 uniform bool useSunrays;
+${flameColor}
 
 void main() {
-  vec3 color = max(texture(dyeField, uv).rgb, vec3(0.0));
+  vec2 picture = uv;
+  vec3 color = max(texture(dyeField, picture).rgb, vec3(0.0));
+  float fuelAlpha = 1.0 - exp(-max(color.r, max(color.g, color.b)) * 2.0);
+
+  if (useInk) {
+    float density = max(texture(dyeField, picture).a, 0.0);
+    vec3 absorption = color / max(density, 0.00001);
+    outputColor = vec4(background * exp(-absorption * (1.0 - exp(-density))), 1.0);
+    return;
+  }
+  if (warmSmoke) {
+    float warmth = clamp(texture(temperatureField, picture).r, 0.0, 1.0);
+    color *= mix(vec3(0.85, 0.88, 0.92), vec3(1.0, 0.68, 0.38), warmth);
+  }
+  if (flameShading) {
+    color = shadeFlame(color, picture);
+  }
 
   if (useShading) {
-    float left = length(texture(dyeField, uv - vec2(texel.x, 0.0)).rgb);
-    float right = length(texture(dyeField, uv + vec2(texel.x, 0.0)).rgb);
-    float bottom = length(texture(dyeField, uv - vec2(0.0, texel.y)).rgb);
-    float top = length(texture(dyeField, uv + vec2(0.0, texel.y)).rgb);
+    float left = length(texture(dyeField, picture - vec2(texel.x, 0.0)).rgb);
+    float right = length(texture(dyeField, picture + vec2(texel.x, 0.0)).rgb);
+    float bottom = length(texture(dyeField, picture - vec2(0.0, texel.y)).rgb);
+    float top = length(texture(dyeField, picture + vec2(0.0, texel.y)).rgb);
     vec3 surfaceNormal = normalize(vec3(right - left, top - bottom, length(texel)));
     float light = clamp(surfaceNormal.z + 0.7, 0.7, 1.0);
     color *= light;
   }
 
   if (useBloom) {
-    color += max(texture(bloomField, uv).rgb, vec3(0.0)) * bloomIntensity;
+    color += max(texture(bloomField, picture).rgb, vec3(0.0)) * bloomIntensity;
   }
 
   if (useSunrays) {
-    float radialLight = max(texture(sunraysField, uv).r, 0.0);
+    float radialLight = max(texture(sunraysField, picture).r, 0.0);
     color += color * radialLight * sunraysWeight;
   }
 
   float alpha = clamp(max(color.r, max(color.g, color.b)), 0.0, 1.0);
+  if (flameShading) {
+    alpha = max(fuelAlpha, useBloom ? clamp(max(color.r, max(color.g, color.b)), 0.0, 1.0) : 0.0);
+  }
   if (useTransparency) {
     outputColor = vec4(color, alpha);
   } else {
