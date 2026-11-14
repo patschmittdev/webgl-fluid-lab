@@ -1,12 +1,10 @@
 # WebGL Fluid Lab
 
-A static WebGL2 fluid playground in the Stam / GPU Gems 3 family. The solver, post-processing, input, presets, and UI live in this repo. Inspired by Pavel Dobryakov's 2017 demo, whose rainbow look is the default preset.
+A fluid simulation that runs in the browser. Paint dye, draw walls for the flow to go around, heat the fluid so it rises, or let music push it around. It is a static page: WebGL2, no build step, no dependencies.
 
 **Live demo:** [patschmittdev.github.io/webgl-fluid-lab](https://patschmittdev.github.io/webgl-fluid-lab/)
 
-The simulation uses a pressure-projection pipeline each frame: advect velocity, advect dye, calculate curl, apply vorticity confinement, calculate divergence, decay and solve pressure, subtract the pressure gradient, then render the dye. Bloom adds a soft-knee bright pass with a downsample and upsample pyramid. Sunrays use a radial transmittance pass derived from the dye mask.
-
-The solver requires WebGL2 and `EXT_color_buffer_float`. If either is unavailable, the page shows a clear fallback message.
+It started from the look of Pavel Dobryakov's 2017 WebGL fluid demo, which is still the default preset. The solver, shaders, presets and UI here are written for this repo.
 
 ## Run locally
 
@@ -14,54 +12,101 @@ The solver requires WebGL2 and `EXT_color_buffer_float`. If either is unavailabl
 npx --yes serve . -p 4173
 ```
 
-Open `http://localhost:4173`. A `file://` URL will not load the ES modules.
+Open `http://localhost:4173`. Opening `index.html` from disk will not work, because browsers do not load ES modules from `file://` URLs.
+
+The page needs WebGL2 and the `EXT_color_buffer_float` extension. Without them it shows a message instead of the simulation.
+
+## Presets
+
+- **Pavel 2017**: the default. Rainbow dye with glow and light rays.
+- **Smoke**: soft grey plumes.
+- **Flame**: a flame from a nozzle at the bottom, coloured by its own heat, white at the base through yellow and orange, with grey smoke where it has cooled.
+- **Ink**: ink on a light page. Thin strokes make a wash and overlapping inks darken.
+- **Wind tunnel**: steady flow from left to right past a disc, with thin streams of dye to show the wake. Draw your own walls.
+- **Plume**: warm smoke rising from the bottom on buoyancy alone.
+- **Jupiter**: east and west jets by latitude, with a long-lived red storm held between two of them. The picture wraps around from one side of the screen to the other. Each latitude slowly re-supplies its own cloud colour, so the bands survive being stirred, and the colour you see is dye carried by the flow. The jet layout and colours are picked to look like the planet; this is not an atmosphere model.
+- **Collide**: every splat is repeated around the centre, rotated and mirrored, inside the simulation. Mirrored pairs of streams run into each other and shoot outward. It is built for music.
 
 ## Controls
 
-- Click-drag on desktop, or swipe on a phone, to paint.
-- Presets switch the complete visual configuration.
-- Each load starts on **Pavel 2017**, the original rainbow demo look. **Smoke** uses soft grey plumes. **Wick** is a warm core with a cooler smoke tip. **Paper** is ink on a light page.
-- Phones start with the panel hidden and cap expensive resolutions.
-- Leave **Mouseover paint** off unless you want cursor motion to paint without a click.
-- **Continuous jet** follows the current preset (off for Smoke and Paper, on for Wick). Same solver, not an engine model.
-- Export or import JSON, or copy a share URL that contains the complete configuration.
-- Splats count persists in `localStorage` under `webgl-labs.fluid.state.v4`. Visual settings reset to Pavel 2017 on every load.
+Hover over any control, or focus it with the keyboard, for a one-line description.
 
-Config from storage, imported JSON, or a share URL is validated before use. Unknown keys are dropped, numbers are clamped to the control ranges, colors must be `#rrggbb`, and invalid palette entries are removed.
+- **Paint, Wall, Erase**: drag on the canvas to add dye and push the fluid, draw solid walls, or rub walls out. Clear walls removes all of them, including a preset's own shapes. Reset brings those back.
+- **View**: dye, speed, vorticity, pressure or temperature. Glow applies to the dye view only.
+- **Pause, Splats, Screenshot, Reset**: Reset clears the fluid and restores the current preset's settings. Screenshot saves the current view as a PNG.
+- **Colour, Glow, Paint, Physics, Simulation**: sliders and toggles, collapsed by default. Symmetry in Paint gives any preset Collide's repeated splats.
+- **Share**: export or import settings as JSON, or copy a link that opens the lab with the same preset and settings. Drawn walls are not included.
+
+Settings from a link or a JSON file are checked before use: unknown keys are dropped, numbers are clamped to the slider ranges, and colours must be `#rrggbb`. Only the splat count is kept between visits (in `localStorage`); every visit starts on Pavel 2017.
 
 ## Keys
 
 - `Space`: random splats
-- `P`: pause while keeping painting available
-- `J`: toggle the continuous jet
+- `P`: pause (you can still paint)
+- `M`: start or stop the demo beat
+- `J`: continuous jet
 - `H`: hide or show the panel
+- `D`, `W`, `E`: Paint, Wall, Erase
+- `V`: next view
 
-Modifier combinations are ignored, so browser shortcuts such as `Ctrl+J` and `Ctrl+P` remain available.
+Keys pressed with Ctrl, Alt, Shift or Cmd are left to the browser.
 
-## Layout
+## Music
+
+Open Music and pick a source:
+
+- **Use tab audio**: share a browser tab that is playing music and tick Share audio. This needs Chrome or Edge.
+- **Demo beat**: a generated drum loop, for trying it out.
+- **Choose a track**: an audio file from your computer. You can also drop one on the page.
+
+The page measures bass, mid and treble, finds beats, and follows how loud and busy the track is. Each preset responds in its own way: Collide fires its central ring on beats and drifts softer wisps in from the edges between them, Flame burns harder with the bass, Jupiter kicks up a storm on each beat. Stopping the music puts everything back.
+
+No audio is bundled, uploaded or recorded, and the microphone is never used. **Reduce flashing** limits beat bursts to two a second and stops music from changing the glow. It starts switched on when the device asks for reduced motion.
+
+## Performance
+
+Presets start at the highest resolution the sliders allow (simulation 512, dye 2048). If the first two seconds average under 30 frames a second, both are halved, and halved again if needed, down to 128 and 512. The status line says when this happens. Phones start with lower caps.
+
+## How it works
+
+Each frame the solver moves velocity and dye along the flow, strengthens small swirls, solves for pressure, and removes the part of the velocity that would compress the fluid. Optional passes add heat and buoyancy, solid walls, a left-to-right inlet and outlet, and the forcing behind the Jupiter preset.
 
 ```text
 index.html
 assets/
-  app.js            UI, state, persistence, share links
-  presets.js        presets, defaults, and authoritative slider ranges
+  app.js                  UI, state, share links
+  help.js                 tooltip text
+  config.js               settings validation and share-link encoding
+  presets.js              presets, defaults and slider ranges
+  audio.js                spectrum levels, beat detection and music mapping
+  music.js                audio sources
+  resolution-monitor.js   frame-rate check and resolution fallback
   styles.css
   engines/
-    lab.js          WebGL2 solver and GPU resource lifecycle
-    lab/shaders.js  GLSL simulation and post-processing programs
+    lab.js                solver and GPU resources
+    lab/shaders.js        core simulation and display shaders
+    lab/physics-shaders.js  walls, through-flow, heat, field views, Jupiter
+tests/
 ```
+
+## Tests
+
+```bash
+npm test
+```
+
+This needs Node.js and nothing else. The tests cover settings validation, the audio maths, and the order and inputs of the solver's passes against a stand-in for WebGL. They do not compile shaders or check what is drawn; that has to be done in a browser.
 
 ## Credits
 
-Inspired by [Pavel Dobryakov's WebGL Fluid Simulation](https://github.com/PavelDoGreat/WebGL-Fluid-Simulation) (MIT, 2017) and the literature it cites. This repo is a separate WebGL2 playground with its own UI, presets, and shaders. It is not a drop-in copy of Pavel's `script.js`, and it is not a claim that the fluid method is original.
+Inspired by [Pavel Dobryakov's WebGL Fluid Simulation](https://github.com/PavelDoGreat/WebGL-Fluid-Simulation) (MIT, 2017). The method is the well-known one described in [GPU Gems, chapter 38](https://developer.nvidia.com/gpugems/gpugems/part-vi-beyond-triangles/chapter-38-fast-fluid-dynamics-simulation-gpu), and nothing here claims to have invented it. See `NOTICE` for the original copyright notice.
 
-The live page footer links to this repository. Attribution and upstream references are maintained here in the README.
+Other projects looked at along the way:
 
-- [WebGL Fluid Simulation CodePen](https://codepen.io/PavelDoGreat/pen/zdWzEL) by [@PavelDoGreat](https://codepen.io/PavelDoGreat)
-- [PavelDoGreat/WebGL-Fluid-Simulation](https://github.com/PavelDoGreat/WebGL-Fluid-Simulation), including its [live demo](https://paveldogreat.github.io/WebGL-Fluid-Simulation/)
-- [WebGL Fluid Enhanced](https://github.com/michaelbrusegard/WebGL-Fluid-Enhanced), an ES-module fork used earlier for comparison
-- [GPU Gems 3, chapter 38: Fast Fluid Dynamics Simulation on the GPU](https://developer.nvidia.com/gpugems/gpugems/part-vi-beyond-triangles/chapter-38-fast-fluid-dynamics-simulation-gpu)
+- [WebGL Fluid Enhanced](https://github.com/michaelbrusegard/WebGL-Fluid-Enhanced)
 - [mharrys/fluids-2d](https://github.com/mharrys/fluids-2d)
 - [haxiomic/GPU-Fluid-Experiments](https://github.com/haxiomic/GPU-Fluid-Experiments)
 
-See `NOTICE` for the original MIT copyright.
+## Licence
+
+MIT. See `LICENSE`.
