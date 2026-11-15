@@ -99,9 +99,6 @@ export function modulateConfig(config, mapping, features, bloomLevel = 0, energy
   if (mapping.curl) {
     changes.curl = (changes.curl ?? config.curl) + mid * mapping.curl;
   }
-  if (mapping.inflow) {
-    changes.inflow = Math.min(Math.max(config.inflow, mapping.inflow[1]), config.inflow + bass * mapping.inflow[0]);
-  }
   if (mapping.heat) {
     changes.heat = config.heat + bass * mapping.heat;
   }

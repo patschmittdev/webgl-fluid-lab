@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { OPTIONAL_SHADERS } from "../assets/engines/lab.js";
+import { RAY_VERTEX_SHADER } from "../assets/engines/lab/physics-shaders.js";
 import { FRAGMENT_SHADERS, FULLSCREEN_VERTEX_SHADER } from "../assets/engines/lab/shaders.js";
 
 const TYPES = "void|bool|int|float|vec2|vec3|vec4|ivec2|ivec3|ivec4|mat2|mat3|mat4";
@@ -22,7 +23,7 @@ function undefinedCalls(source) {
 }
 
 test("every shader defines the functions it calls", () => {
-  const sources = { vertex: FULLSCREEN_VERTEX_SHADER, ...FRAGMENT_SHADERS, ...OPTIONAL_SHADERS };
+  const sources = { vertex: FULLSCREEN_VERTEX_SHADER, rayVertex: RAY_VERTEX_SHADER, ...FRAGMENT_SHADERS, ...OPTIONAL_SHADERS };
   for (const [name, source] of Object.entries(sources)) {
     assert.deepEqual(undefinedCalls(source), [], `${name} calls a function it does not define`);
     assert.match(source, /void\s+main\s*\(/, `${name} has an entry point`);

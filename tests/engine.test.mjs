@@ -10,6 +10,7 @@ function fixture(t, config) {
   const draws = [];
   const uniforms = [];
   const textures = new Map();
+  const buffers = [];
   let framebuffer;
   let program;
   let unit = 0;
@@ -44,6 +45,11 @@ function fixture(t, config) {
     createTexture: () => allocate("texture"),
     createFramebuffer: () => allocate("framebuffer"),
     createVertexArray: () => allocate("vao"),
+    createBuffer: () => allocate("buffer"),
+    deleteBuffer: release,
+    bufferData(type, data) {
+      buffers.push(data);
+    },
     deleteShader: release,
     deleteProgram: release,
     deleteTexture: release,
@@ -149,7 +155,7 @@ function fixture(t, config) {
     engine.destroy();
     assert.equal(live.size, 0, "all GPU resources released");
   });
-  return { engine, canvas, draws, live, uniforms };
+  return { engine, canvas, draws, live, uniforms, buffers };
 }
 
 test("original presets allocate no physics targets and keep their solver pass count", t => {
@@ -167,8 +173,8 @@ test("original presets allocate no physics targets and keep their solver pass co
 });
 
 test("all new presets and views draw without resource feedback", t => {
-  const { engine } = fixture(t, PRESETS.tunnel.config);
-  for (const name of ["tunnel", "plume", "flame"]) {
+  const { engine } = fixture(t, PRESETS.blackhole.config);
+  for (const name of ["blackhole", "plume", "flame"]) {
     engine.setConfig(PRESETS[name].config);
     engine.reset(PRESETS[name].physics);
     engine.step(1 / 60);
@@ -212,20 +218,19 @@ test("walls, heat, resize, resolution changes, and reset release replaced target
   assert.equal(engine.targets.obstacles, null);
 });
 
-test("seeded walls return on reset and temperature view does not retain an unused field", t => {
-  const { engine, canvas, live } = fixture(t, PRESETS.tunnel.config);
-  engine.reset(PRESETS.tunnel.physics);
+test("the black hole is not a wall, and temperature view does not retain an unused field", t => {
+  const { engine, draws } = fixture(t, PRESETS.blackhole.config);
+  engine.reset(PRESETS.blackhole.physics);
+  engine.step(1 / 60);
+  assert.equal(engine.targets.obstacles, null, "no wall mask until a wall is drawn");
+  draws.length = 0;
+  engine.step(1 / 60);
+  assert.ok(draws.some(program => program.uniforms.some(item => item.name === "holeSpin")), "the swirl is still applied");
+  engine.paintWall(0.2, 0.3, 0.2, 0.7, true);
   assert.ok(engine.targets.obstacles);
-  const oldMask = engine.targets.obstacles.read.texture;
-  canvas.clientWidth = 800;
-  engine.resizeCanvas();
-  engine.ensureTargets();
-  assert.equal(live.has(oldMask), false);
-  assert.equal(engine.targets.obstacles.width, engine.targets.velocity.width);
   engine.clearWalls();
+  engine.step(1 / 60);
   assert.equal(engine.targets.obstacles, null);
-  engine.reset();
-  assert.ok(engine.targets.obstacles);
   engine.setConfig({ ...PHYSICS_DEFAULTS, ...PRESETS.smoke.config, view: "temperature" });
   engine.reset({});
   assert.ok(engine.targets.temperature);
@@ -252,7 +257,7 @@ test("ink uses the display shader and skips glow even when enabled", t => {
 
 test("each preset adds a fixed number of solver passes", t => {
   const { engine, draws } = fixture(t, PRESETS.pavel.config);
-  const overhead = { pavel: 7, smoke: 7, ink: 7, tunnel: 9, plume: 11 };
+  const overhead = { pavel: 7, smoke: 7, ink: 7, blackhole: 9, plume: 11 };
   for (const [name, passes] of Object.entries(overhead)) {
     engine.setConfig({ ...PHYSICS_DEFAULTS, ...PRESETS[name].config });
     engine.reset(PRESETS[name].physics ?? {});
@@ -290,7 +295,6 @@ test("preset force tuning retains the previous screen-space input speeds", () =>
     ["pavel", "splatForce", 6000, 128],
     ["smoke", "splatForce", 6000, 384],
     ["ink", "splatForce", 6000, 384],
-    ["tunnel", "inflow", 80, 256],
     ["plume", "buoyancy", 65, 192],
     ["smoke", "curl", 8, 384],
     ["ink", "curl", 10, 384],
@@ -564,11 +568,6 @@ test("drawing or erasing a wall refreshes the wall-reach mask in both directions
     assert.deepEqual(uniforms.filter(item => item.name === "axis").map(item => item.value), [[1, 0], [0, 1]]);
     assert.ok(draws.indexOf(reach[0]) > draws.findIndex(program => program.uniforms.some(item => item.name === "startPoint")));
   }
-  engine.reset(PRESETS.tunnel.physics);
-  draws.length = 0;
-  engine.setConfig(PRESETS.tunnel.config);
-  engine.reset(PRESETS.tunnel.physics);
-  assert.equal(draws.filter(program => program.uniforms.some(item => item.name === "axis")).length, 2, "seeded shapes get a reach mask too");
 });
 
 test("Ink's random splats and music bursts carry ink, not only motion", t => {
@@ -603,3 +602,107 @@ test("zero music sensitivity leaves Collide as it is without music", t => {
   assert.equal(engine.musicHue, null);
   assert.ok(automatic >= 1, "the pattern used without music keeps running");
 });
+
+test("the black hole spins the fluid near it, feeds its rays to the dye, draws them on screen and scales to a narrow screen", t => {
+  const preset = PRESETS.blackhole;
+  const { hole, rays } = preset.physics;
+  const { engine, canvas, uniforms, draws } = fixture(t, preset.config);
+  const last = name => uniforms.findLast(item => item.name === name).value;
+  for (const [width, height, fit] of [[640, 480, 1], [400, 800, 0.5]]) {
+    canvas.clientWidth = width;
+    canvas.clientHeight = height;
+    engine.resizeCanvas();
+    engine.setConfig(preset.config);
+    engine.reset(preset.physics);
+    uniforms.length = 0;
+    draws.length = 0;
+    engine.step(1 / 60);
+    assert.deepEqual(last("hole"), [hole.x, hole.y, hole.radius * fit]);
+    assert.deepEqual(last("holeSpin"), [hole.spin * engine.velocityScale() * fit, hole.disc * fit]);
+    assert.equal(last("holeAspect"), width / height);
+    assert.deepEqual(last("rayLow"), rays.colors[0]);
+    assert.ok(Math.abs(last("rayTravel")[0] - rays.speed / 60) < 1e-9, "light sets out when the preset starts");
+    assert.equal(draws.filter(program => program.uniforms.some(item => item.name === "rayTravel")).length, 1);
+    assert.ok(last("rayFeed") > 0 && last("rayFeed") < 1, "the solver pass feeds the dye");
+    const onScreen = () => draws.findLast(program => program.uniforms.some(item => item.name === "rayScreen"))
+      .uniforms.find(item => item.name === "rayScreen").value;
+    assert.equal(onScreen(), 0);
+    uniforms.length = 0;
+    engine.step(0);
+    assert.equal(last("rayFeed"), 0, "a frame with no time in it feeds nothing");
+    assert.equal(onScreen(), 0, "and still draws into the dye the same way");
+    assert.ok(last("rayWidth") >= rays.width);
+    assert.ok(engine.rays.count > 0 && engine.rays.count % 6 === 0);
+    for (const [view, gain] of [["dye", 1], ["speed", 0.45]]) {
+      engine.setConfig({ view });
+      engine.ensureTargets();
+      uniforms.length = 0;
+      draws.length = 0;
+      engine.render();
+      assert.ok(draws.at(-1).uniforms.some(item => item.name === "rayTravel"), "the rays are drawn last, over the " + view + " view");
+      assert.equal(last("rayFeed"), 0);
+      assert.equal(onScreen(), 1);
+      assert.equal(last("rayGain"), gain);
+      assert.ok(last("rayWidth") >= 4 * 1.25 / height - 1e-12, "at least a pixel wide on screen");
+    }
+    engine.setConfig({ view: "temperature" });
+    engine.ensureTargets();
+    draws.length = 0;
+    engine.step(1 / 60);
+    assert.equal(draws.filter(program => program.uniforms.some(item => item.name === "rayTravel")).length, 2, "the light also warms the fluid");
+    engine.setConfig({ view: "dye" });
+    assert.equal(preset.config.inflow, 0, "a through-flow would carry the rays off their paths");
+  }
+  engine.musicMapping = preset.music;
+  engine.readMusic = () => ({ bass: 1, mid: 0, treble: 0, overall: 1, brightness: 0, beat: false, timeSinceBeat: 1 });
+  uniforms.length = 0;
+  engine.runFrame(1 / 60, 1);
+  assert.deepEqual(last("holeGlow"), [hole.disc * 0.5, hole.glow * 2], "bass makes the disc flare");
+  assert.equal(engine.musicFlare, 1);
+  engine.setConfig({ reduceFlashing: true });
+  uniforms.length = 0;
+  engine.runFrame(1 / 60, 2);
+  assert.deepEqual(last("holeGlow"), [hole.disc * 0.5, hole.glow], "Reduce flashing holds the disc steady");
+  engine.setConfig({ reduceFlashing: false });
+  engine.setConfig({ ...PHYSICS_DEFAULTS, ...PRESETS.plume.config });
+  engine.reset(PRESETS.plume.physics);
+  assert.equal(engine.rays, null);
+  engine.paintWall(0.4, 0.1, 0.4, 0.9, true);
+  uniforms.length = 0;
+  draws.length = 0;
+  engine.step(1 / 60);
+  assert.deepEqual(last("hole"), [0, 0, 0], "other presets have no hole, even with walls");
+  assert.equal(draws.filter(program => program.uniforms.some(item => item.name === "rayTravel")).length, 0);
+  assert.equal(engine.wallShadow, null, "only the black hole keeps a copy of the walls");
+});
+
+test("a wall stops the rays that reach it until it is erased or cleared", t => {
+  const preset = PRESETS.blackhole;
+  const { engine, buffers } = fixture(t, preset.config);
+  engine.reset(preset.physics);
+  const stopped = () => {
+    engine.step(1 / 60);
+    const corners = buffers.at(-1);
+    let count = 0;
+    for (let index = 7; index < corners.length; index += 8) {
+      count += corners[index] < 1e9 ? 1 : 0;
+    }
+    return count;
+  };
+  assert.equal(stopped(), 0);
+  engine.paintWall(0.2, 0.3, 0.2, 0.7, true);
+  const blocked = stopped();
+  assert.ok(blocked > 0);
+  engine.paintWall(0.2, 0.45, 0.2, 0.55, false);
+  const gap = stopped();
+  assert.ok(gap > 0 && gap < blocked, "a gap lets some rays through");
+  engine.paintWall(0.2, 0.3, 0.2, 0.7, false);
+  assert.equal(stopped(), 0);
+  engine.paintWall(0.2, 0.3, 0.2, 0.7, true);
+  engine.clearWalls();
+  assert.equal(stopped(), 0);
+  const built = buffers.length;
+  engine.step(1 / 60);
+  assert.equal(buffers.length, built, "the rays are rebuilt only when something changes");
+});
+
