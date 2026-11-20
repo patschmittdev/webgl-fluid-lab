@@ -4,6 +4,12 @@ A fluid simulation that runs in the browser. Paint dye, draw walls for the flow 
 
 **Live demo:** [patschmittdev.github.io/webgl-fluid-lab](https://patschmittdev.github.io/webgl-fluid-lab/)
 
+![Pavel 2017 preset: rainbow dye painted and splashed across a dark canvas, curling as it flows](media/pavel-2017.gif)
+
+| Flame | Ink |
+| --- | --- |
+| ![Flame preset: a flame burns from a nozzle at the bottom while a painted stroke of fire drifts above it](media/flame.gif) | ![Ink preset: red and blue ink strokes spread and curl on a light page](media/ink.gif) |
+
 It started from the look of Pavel Dobryakov's 2017 WebGL fluid demo, which is still the default preset. The solver, shaders, presets and UI here are written for this repo.
 
 ## Run locally
